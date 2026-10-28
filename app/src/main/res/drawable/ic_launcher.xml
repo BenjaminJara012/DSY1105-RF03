@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PROVISIONAL: logo genérico (libro de clases con check) mientras no se cuente con el logo
+     oficial. Para reemplazarlo: copiar el PNG oficial a res/drawable/ con el nombre
+     logo_app.png y borrar este .xml (el código no cambia). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path android:fillColor="@color/marca_azul" android:pathData="M4,60 A56,56 0 1,1 116,60 A56,56 0 1,1 4,60 Z" />
+    <!-- Libro -->
+    <path android:fillColor="@color/marca_blanco" android:pathData="M36,28 L84,28 L84,92 L36,92 Z" />
+    <path android:fillColor="@color/marca_verde" android:pathData="M36,28 L44,28 L44,92 L36,92 Z" />
+    <!-- Check -->
+    <path android:strokeColor="@color/marca_verde" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M52,60 L62,70 L78,50" />
+</vector>
