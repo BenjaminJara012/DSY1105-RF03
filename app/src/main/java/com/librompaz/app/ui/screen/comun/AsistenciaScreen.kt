@@ -1,5 +1,12 @@
 package com.librompaz.app.ui.screen.comun
 
+
+
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -188,15 +195,69 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     }
 }
 
-/** Botón compacto de un estado (relleno si está elegido). */
+/**
+ * Botón para seleccionar un estado de asistencia.
+ *
+ * Al seleccionar un estado:
+ * - Cambia suavemente el color del botón.
+ * - Anima ligeramente su tamaño.
+ * - Mantiene visible la opción seleccionada.
+ *
+ * @param texto Letra del estado: P, A, T o J.
+ * @param seleccionado Indica si el estado está activo.
+ * @param onClick Acción ejecutada al presionar el botón.
+ */
 @Composable
-private fun BotonEstado(texto: String, seleccionado: Boolean, onClick: () -> Unit) {
-    val modificador = Modifier
-        .padding(start = 4.dp)
-        .size(40.dp)
-    if (seleccionado) {
-        Button(onClick = onClick, modifier = modificador, contentPadding = PaddingValues(0.dp)) { Text(texto) }
-    } else {
-        OutlinedButton(onClick = onClick, modifier = modificador, contentPadding = PaddingValues(0.dp)) { Text(texto) }
+private fun BotonEstado(
+    texto: String,
+    seleccionado: Boolean,
+    onClick: () -> Unit
+) {
+    val colores = MaterialTheme.colorScheme
+
+    // Animación del color de fondo.
+    val fondo by animateColorAsState(
+        targetValue = if (seleccionado) {
+            colores.primary
+        } else {
+            colores.surface
+        },
+        label = "Color fondo asistencia"
+    )
+
+    // Animación del color del texto.
+    val textoColor by animateColorAsState(
+        targetValue = if (seleccionado) {
+            colores.onPrimary
+        } else {
+            colores.onSurface
+        },
+        label = "Color texto asistencia"
+    )
+
+    // El botón seleccionado aumenta ligeramente su escala.
+    val escala by animateFloatAsState(
+        targetValue = if (seleccionado) 1f else 0.94f,
+        label = "Escala boton asistencia"
+    )
+
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .padding(start = 4.dp)
+            .size(44.dp)
+            .scale(escala),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = fondo,
+            contentColor = textoColor
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (seleccionado) colores.primary
+            else colores.outline
+        ),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Text(texto)
     }
 }
