@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.librompaz.app.util.validarFechaAsistencia
+import com.librompaz.app.data.AsistenciaRepository
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel único, compartido por todas las pantallas (se crea una sola vez en AppNavigation).
@@ -37,7 +40,9 @@ import com.librompaz.app.util.validarFechaAsistencia
  * Regla de negocio transversal: TODA creación o modificación debe dejar un RegistroAuditoria
  * (usuario, fecha y hora) automático e inalterable. Implementarla en cada función que guarde.
  */
-class LibroMpazViewModel : ViewModel() {
+class LibroMpazViewModel(
+    private val asistenciaRepository: AsistenciaRepository? = null
+) : ViewModel() {
 
     // =====================================================================
     // Módulo "Autenticación y alcance por rol"
@@ -108,40 +113,43 @@ class LibroMpazViewModel : ViewModel() {
      */
     fun misCargas(usuario: Usuario?): List<CargaDocente> = MockData.cargas
 
+
     // =====================================================================
     // Módulo "Asistencia"
     // =====================================================================
 
     private val _asistencias = MutableStateFlow(MockData.asistencias)
 
-
-    /**
-     * Indica si se está consultando o guardando asistencia.
-     * La interfaz puede utilizarlo para mostrar un indicador de carga.
-     */
+    // Indica si hay una operación de asistencia en curso.
     private val _cargandoAsistencia = MutableStateFlow(false)
     val cargandoAsistencia: StateFlow<Boolean> =
         _cargandoAsistencia.asStateFlow()
 
-    /**
-     * Contiene el último error producido en el módulo de asistencia.
-     * Si es null, no hay ningún error pendiente.
-     */
+    // Comunica errores a la interfaz.
     private val _errorAsistencia = MutableStateFlow<String?>(null)
     val errorAsistencia: StateFlow<String?> =
         _errorAsistencia.asStateFlow()
 
-    /**
-     * Contiene un mensaje de confirmación cuando la operación termina.
-     */
+    // Comunica confirmaciones a la interfaz.
     private val _mensajeAsistencia = MutableStateFlow<String?>(null)
     val mensajeAsistencia: StateFlow<String?> =
         _mensajeAsistencia.asStateFlow()
 
+    // Estados recuperados desde Room.
+    private val _estadosAsistenciaGuardada =
+        MutableStateFlow<Map<String, EstadoAsistencia>>(emptyMap())
+
+    val estadosAsistenciaGuardada: StateFlow<Map<String, EstadoAsistencia>> =
+        _estadosAsistenciaGuardada.asStateFlow()
+
+    // Permite descartar resultados de consultas anteriores.
+    private var ultimaConsultaAsistencia = 0L
+
+    // Evita consultas y guardados simultáneos.
+    private var guardandoAsistencia = false
 
     /**
-     * Limpia los mensajes del módulo de asistencia.
-     * Evita mostrar errores o confirmaciones de operaciones anteriores.
+     * Limpia los mensajes de operaciones anteriores.
      */
     fun limpiarMensajesAsistencia() {
         _errorAsistencia.value = null
@@ -149,23 +157,16 @@ class LibroMpazViewModel : ViewModel() {
     }
 
     /**
-     * Verifica que el usuario activo sea un docente
-     * y tenga asignado el curso solicitado.
-     *
-     * @param cursoId Identificador del curso.
-     * @return true si está autorizado; false si no.
+     * Comprueba que el usuario sea docente
+     * y tenga asignado el curso.
      */
     fun puedeRegistrarAsistencia(cursoId: String): Boolean {
-
-        // Obtiene el usuario que inició sesión.
         val usuario = _usuarioActivo.value ?: return false
 
-        // Solo los docentes pueden registrar asistencia.
         if (usuario.perfil != Perfil.DOCENTE) {
             return false
         }
 
-        // Comprueba que el docente tenga asignado el curso.
         return MockData.cargas.any { carga ->
             carga.docenteId == usuario.id &&
                     carga.cursoId == cursoId
@@ -173,105 +174,203 @@ class LibroMpazViewModel : ViewModel() {
     }
 
     /**
-     * Verifica que los estados recibidos correspondan
+     * Comprueba que los estados correspondan
      * exactamente a los estudiantes del curso.
-     *
-     * Evita guardar estudiantes de otros cursos
-     * o registros incompletos.
      */
     fun validarEstudiantesAsistencia(
         cursoId: String,
         estados: Map<String, EstadoAsistencia>
     ): Boolean {
-
-        // Obtiene los identificadores de los estudiantes del curso.
         val estudiantesEsperados = estudiantesDelCurso(cursoId)
             .map { it.id }
             .toSet()
 
-        // No permite registrar asistencia en cursos sin estudiantes.
         if (estudiantesEsperados.isEmpty()) {
             return false
         }
 
-        // Los estudiantes recibidos deben coincidir exactamente.
         return estados.keys == estudiantesEsperados
     }
 
     /**
-     * TODO(equipo): devolver la asistencia ya guardada del curso en esa fecha
-     * (idEstudiante -> estado), para mostrarla y poder corregirla. Hoy devuelve un mapa vacío.
-     * Pendiente con el CITT: si se puede corregir la asistencia de días anteriores.
+     * Compatibilidad temporal con la pantalla original.
+     * La interfaz nueva utilizará cargarAsistencia()
+     * y estadosAsistenciaGuardada.
      */
-    fun asistenciaGuardada(cursoId: String, fecha: String): Map<String, EstadoAsistencia> = emptyMap()
+    fun asistenciaGuardada(
+        cursoId: String,
+        fecha: String
+    ): Map<String, EstadoAsistencia> = emptyMap()
 
     /**
-     * TODO(equipo): guardar (o sobrescribir) la asistencia del curso en esa fecha, con
-     * registradoPor = usuario activo y la fecha y hora actuales, y dejar un RegistroAuditoria.
-     * RF: "registrar la asistencia diaria con estados presente, ausente, atrasado, justificado".
-     * Hoy no hace nada.
+     * Consulta la asistencia almacenada en Room.
+     * Descarta resultados de consultas anteriores.
      */
+    fun cargarAsistencia(cursoId: String, fecha: String) {
+
+        // No permite consultar mientras se guarda.
+        if (guardandoAsistencia) {
+            _errorAsistencia.value =
+                "Espera a que termine el guardado."
+            return
+        }
+
+        val consultaActual = ++ultimaConsultaAsistencia
+
+        limpiarMensajesAsistencia()
+        _estadosAsistenciaGuardada.value = emptyMap()
+
+        if (!validarFechaAsistencia(fecha)) {
+            _errorAsistencia.value =
+                "La fecha ingresada no es válida."
+            _cargandoAsistencia.value = false
+            return
+        }
+
+        if (cursoId.isBlank()) {
+            _errorAsistencia.value =
+                "Debes seleccionar un curso."
+            _cargandoAsistencia.value = false
+            return
+        }
+
+        _cargandoAsistencia.value = true
+
+        viewModelScope.launch {
+            try {
+                val repository = checkNotNull(asistenciaRepository) {
+                    "El Repository de asistencia no fue inicializado."
+                }
+
+                val registros = repository.obtenerAsistencia(
+                    cursoId,
+                    fecha
+                )
+
+                // Solo publica la consulta más reciente.
+                if (consultaActual == ultimaConsultaAsistencia) {
+                    _estadosAsistenciaGuardada.value =
+                        registros.associate { registro ->
+                            registro.estudianteId to registro.estado
+                        }
+                }
+
+            } catch (e: Exception) {
+                if (consultaActual == ultimaConsultaAsistencia) {
+                    _errorAsistencia.value =
+                        "No se pudo cargar la asistencia."
+                }
+            } finally {
+                if (consultaActual == ultimaConsultaAsistencia) {
+                    _cargandoAsistencia.value = false
+                }
+            }
+        }
+    }
 
     /**
-     * Valida los datos antes de registrar asistencia.
-     *
-     * El guardado definitivo se conectará al Repository
-     * cuando esté disponible la implementación de Room.
+     * Valida y guarda asistencia junto con su auditoría.
+     * Publica el resultado mediante StateFlow.
      */
     fun guardarAsistencia(
         cursoId: String,
         fecha: String,
         estados: Map<String, EstadoAsistencia>
     ) {
-
-        // Limpia los mensajes de operaciones anteriores.
-        limpiarMensajesAsistencia()
-
-        // Comprueba que la fecha sea válida y no futura.
-        if (!validarFechaAsistencia(fecha)) {
-            _errorAsistencia.value = "La fecha ingresada no es válida."
+        // Evita operaciones simultáneas.
+        if (guardandoAsistencia || _cargandoAsistencia.value) {
             return
         }
 
-        // Comprueba que el docente tenga asignado el curso.
+        limpiarMensajesAsistencia()
+
+        if (!validarFechaAsistencia(fecha)) {
+            _errorAsistencia.value =
+                "La fecha ingresada no es válida."
+            return
+        }
+
         if (!puedeRegistrarAsistencia(cursoId)) {
             _errorAsistencia.value =
                 "No tienes autorización para registrar asistencia en este curso."
             return
         }
 
-        // Comprueba que los estudiantes pertenezcan al curso.
         if (!validarEstudiantesAsistencia(cursoId, estados)) {
             _errorAsistencia.value =
                 "Los estudiantes no corresponden al curso seleccionado."
             return
         }
 
-        // Pendiente: conectar el guardado con el Repository de Room.
-        _errorAsistencia.value =
-            "Las validaciones fueron aprobadas, pero el guardado aún no está disponible."
+        val usuario = _usuarioActivo.value ?: run {
+            _errorAsistencia.value = "Debes iniciar sesión."
+            return
+        }
+
+        val detalle = construirDetalleAsistencia(
+            cursoId,
+            fecha,
+            usuario
+        )
+
+        // Guarda qué consulta estaba activa.
+        val consultaAlGuardar = ultimaConsultaAsistencia
+
+        // Bloquea inmediatamente nuevas operaciones.
+        guardandoAsistencia = true
+        _cargandoAsistencia.value = true
+
+        viewModelScope.launch {
+            try {
+                val repository = checkNotNull(asistenciaRepository) {
+                    "El Repository de asistencia no fue inicializado."
+                }
+
+                // El Repository guarda registros y auditoría.
+                val accion = repository.guardarAsistencia(
+                    cursoId = cursoId,
+                    fecha = fecha,
+                    estados = estados,
+                    usuario = usuario,
+                    detalle = detalle
+                )
+
+                // Actualiza los estados solo si la consulta
+                // vigente no ha cambiado.
+                if (consultaAlGuardar == ultimaConsultaAsistencia) {
+                    _estadosAsistenciaGuardada.value = estados
+                }
+
+                _mensajeAsistencia.value = when (accion) {
+                    "CREAR" ->
+                        "Asistencia registrada correctamente."
+                    "MODIFICAR" ->
+                        "Asistencia actualizada correctamente."
+                    else ->
+                        "Operación de asistencia completada."
+                }
+
+            } catch (e: Exception) {
+                _errorAsistencia.value =
+                    "No se pudo guardar la asistencia. Inténtalo nuevamente."
+            } finally {
+                guardandoAsistencia = false
+                _cargandoAsistencia.value = false
+            }
+        }
     }
 
-
     /**
-     * Construye la descripción de la operación de asistencia
-     * que se enviará al Repository para registrar la auditoría.
-     */
-
-    /**
-     * Construye el detalle para la auditoría de asistencia.
-     * Incluye curso, fecha y asignaturas asignadas al docente.
+     * Construye el detalle de auditoría con
+     * curso, asignaturas y fecha.
      */
     fun construirDetalleAsistencia(
         cursoId: String,
         fecha: String,
         usuario: Usuario
     ): String {
-
-        // Obtiene el nombre del curso.
         val nombreCurso = cursoPorId(cursoId)?.nombre ?: cursoId
 
-        // Busca las asignaturas del docente en ese curso.
         val nombresAsignaturas = MockData.cargas
             .filter { carga ->
                 carga.docenteId == usuario.id &&
@@ -282,7 +381,6 @@ class LibroMpazViewModel : ViewModel() {
             }
             .distinct()
 
-        // Une las asignaturas, si existen.
         val asignaturas = nombresAsignaturas.joinToString(", ")
 
         return buildString {
@@ -296,21 +394,12 @@ class LibroMpazViewModel : ViewModel() {
         }
     }
 
-
-
-
-    /**
-     * TODO(equipo): porcentaje de asistencia del curso (0 a 100) para Inspectoría y Dirección.
-     * Hoy devuelve null (sin calcular).
-     */
+    // Pendiente para los módulos de Inspectoría y Dirección.
     fun porcentajeAsistencia(cursoId: String): Int? = null
 
-    /**
-     * TODO(equipo): estudiantes con inasistencias reiteradas (por ejemplo, 3 o más ausencias),
-     * con su número de ausencias. RF de Inspectoría: "identificar inasistencias reiteradas".
-     * Hoy devuelve una lista vacía.
-     */
-    fun inasistenciasReiteradas(): List<Pair<Estudiante, Int>> = emptyList()
+    fun inasistenciasReiteradas(): List<Pair<Estudiante, Int>> =
+        emptyList()
+
 
     // =====================================================================
     // Módulo "Cobertura curricular"
