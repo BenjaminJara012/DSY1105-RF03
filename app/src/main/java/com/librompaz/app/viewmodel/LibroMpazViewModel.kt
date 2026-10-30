@@ -20,6 +20,7 @@ import com.librompaz.app.model.Usuario
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.librompaz.app.util.validarFechaAsistencia
 
 /**
  * ViewModel único, compartido por todas las pantallas (se crea una sola vez en AppNavigation).
@@ -210,9 +211,93 @@ class LibroMpazViewModel : ViewModel() {
      * RF: "registrar la asistencia diaria con estados presente, ausente, atrasado, justificado".
      * Hoy no hace nada.
      */
-    fun guardarAsistencia(cursoId: String, fecha: String, estados: Map<String, EstadoAsistencia>) {
-        // Sin implementar todavía.
+
+    /**
+     * Valida los datos antes de registrar asistencia.
+     *
+     * El guardado definitivo se conectará al Repository
+     * cuando esté disponible la implementación de Room.
+     */
+    fun guardarAsistencia(
+        cursoId: String,
+        fecha: String,
+        estados: Map<String, EstadoAsistencia>
+    ) {
+
+        // Limpia los mensajes de operaciones anteriores.
+        limpiarMensajesAsistencia()
+
+        // Comprueba que la fecha sea válida y no futura.
+        if (!validarFechaAsistencia(fecha)) {
+            _errorAsistencia.value = "La fecha ingresada no es válida."
+            return
+        }
+
+        // Comprueba que el docente tenga asignado el curso.
+        if (!puedeRegistrarAsistencia(cursoId)) {
+            _errorAsistencia.value =
+                "No tienes autorización para registrar asistencia en este curso."
+            return
+        }
+
+        // Comprueba que los estudiantes pertenezcan al curso.
+        if (!validarEstudiantesAsistencia(cursoId, estados)) {
+            _errorAsistencia.value =
+                "Los estudiantes no corresponden al curso seleccionado."
+            return
+        }
+
+        // Pendiente: conectar el guardado con el Repository de Room.
+        _errorAsistencia.value =
+            "Las validaciones fueron aprobadas, pero el guardado aún no está disponible."
     }
+
+
+    /**
+     * Construye la descripción de la operación de asistencia
+     * que se enviará al Repository para registrar la auditoría.
+     */
+
+    /**
+     * Construye el detalle para la auditoría de asistencia.
+     * Incluye curso, fecha y asignaturas asignadas al docente.
+     */
+    fun construirDetalleAsistencia(
+        cursoId: String,
+        fecha: String,
+        usuario: Usuario
+    ): String {
+
+        // Obtiene el nombre del curso.
+        val nombreCurso = cursoPorId(cursoId)?.nombre ?: cursoId
+
+        // Busca las asignaturas del docente en ese curso.
+        val nombresAsignaturas = MockData.cargas
+            .filter { carga ->
+                carga.docenteId == usuario.id &&
+                        carga.cursoId == cursoId
+            }
+            .mapNotNull { carga ->
+                asignaturaPorId(carga.asignaturaId)?.nombre
+            }
+            .distinct()
+
+        // Une las asignaturas, si existen.
+        val asignaturas = nombresAsignaturas.joinToString(", ")
+
+        return buildString {
+            append("Asistencia $nombreCurso")
+
+            if (asignaturas.isNotEmpty()) {
+                append(", $asignaturas")
+            }
+
+            append(", $fecha")
+        }
+    }
+
+
+
 
     /**
      * TODO(equipo): porcentaje de asistencia del curso (0 a 100) para Inspectoría y Dirección.
