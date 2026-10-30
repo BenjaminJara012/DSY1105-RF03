@@ -113,6 +113,90 @@ class LibroMpazViewModel : ViewModel() {
 
     private val _asistencias = MutableStateFlow(MockData.asistencias)
 
+
+    /**
+     * Indica si se está consultando o guardando asistencia.
+     * La interfaz puede utilizarlo para mostrar un indicador de carga.
+     */
+    private val _cargandoAsistencia = MutableStateFlow(false)
+    val cargandoAsistencia: StateFlow<Boolean> =
+        _cargandoAsistencia.asStateFlow()
+
+    /**
+     * Contiene el último error producido en el módulo de asistencia.
+     * Si es null, no hay ningún error pendiente.
+     */
+    private val _errorAsistencia = MutableStateFlow<String?>(null)
+    val errorAsistencia: StateFlow<String?> =
+        _errorAsistencia.asStateFlow()
+
+    /**
+     * Contiene un mensaje de confirmación cuando la operación termina.
+     */
+    private val _mensajeAsistencia = MutableStateFlow<String?>(null)
+    val mensajeAsistencia: StateFlow<String?> =
+        _mensajeAsistencia.asStateFlow()
+
+
+    /**
+     * Limpia los mensajes del módulo de asistencia.
+     * Evita mostrar errores o confirmaciones de operaciones anteriores.
+     */
+    fun limpiarMensajesAsistencia() {
+        _errorAsistencia.value = null
+        _mensajeAsistencia.value = null
+    }
+
+    /**
+     * Verifica que el usuario activo sea un docente
+     * y tenga asignado el curso solicitado.
+     *
+     * @param cursoId Identificador del curso.
+     * @return true si está autorizado; false si no.
+     */
+    fun puedeRegistrarAsistencia(cursoId: String): Boolean {
+
+        // Obtiene el usuario que inició sesión.
+        val usuario = _usuarioActivo.value ?: return false
+
+        // Solo los docentes pueden registrar asistencia.
+        if (usuario.perfil != Perfil.DOCENTE) {
+            return false
+        }
+
+        // Comprueba que el docente tenga asignado el curso.
+        return MockData.cargas.any { carga ->
+            carga.docenteId == usuario.id &&
+                    carga.cursoId == cursoId
+        }
+    }
+
+    /**
+     * Verifica que los estados recibidos correspondan
+     * exactamente a los estudiantes del curso.
+     *
+     * Evita guardar estudiantes de otros cursos
+     * o registros incompletos.
+     */
+    fun validarEstudiantesAsistencia(
+        cursoId: String,
+        estados: Map<String, EstadoAsistencia>
+    ): Boolean {
+
+        // Obtiene los identificadores de los estudiantes del curso.
+        val estudiantesEsperados = estudiantesDelCurso(cursoId)
+            .map { it.id }
+            .toSet()
+
+        // No permite registrar asistencia en cursos sin estudiantes.
+        if (estudiantesEsperados.isEmpty()) {
+            return false
+        }
+
+        // Los estudiantes recibidos deben coincidir exactamente.
+        return estados.keys == estudiantesEsperados
+    }
+
     /**
      * TODO(equipo): devolver la asistencia ya guardada del curso en esa fecha
      * (idEstudiante -> estado), para mostrarla y poder corregirla. Hoy devuelve un mapa vacío.
