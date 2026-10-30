@@ -5,6 +5,7 @@ import com.librompaz.app.data.local.AsistenciaEntity
 import com.librompaz.app.data.local.AuditoriaEntity
 import com.librompaz.app.model.EstadoAsistencia
 import com.librompaz.app.model.Perfil
+import com.librompaz.app.model.RegistroAsistencia
 import com.librompaz.app.model.RegistroAuditoria
 import com.librompaz.app.model.Usuario
 import kotlinx.coroutines.flow.Flow
@@ -16,14 +17,23 @@ import java.util.UUID
 
 class AsistenciaRepository(private val db: AppDatabase) {
 
-    suspend fun asistenciaGuardada(
+    suspend fun obtenerAsistencia(
         cursoId: String,
         fecha: String
-    ): Map<String, EstadoAsistencia> =
-        db.asistenciaDao().delCursoEnFecha(cursoId, fecha)
-            .associate { it.estudianteId to EstadoAsistencia.valueOf(it.estado) }
+    ): List<RegistroAsistencia> =
+        db.asistenciaDao().delCursoEnFecha(cursoId, fecha).map {
+            RegistroAsistencia(
+                id = it.id,
+                estudianteId = it.estudianteId,
+                cursoId = it.cursoId,
+                fecha = it.fecha,
+                estado = EstadoAsistencia.valueOf(it.estado),
+                registradoPor = it.registradoPor,
+                fechaHoraRegistro = it.fechaHoraRegistro
+            )
+        }
 
-    suspend fun guardar(
+    suspend fun guardarAsistencia(
         cursoId: String,
         fecha: String,
         estados: Map<String, EstadoAsistencia>,

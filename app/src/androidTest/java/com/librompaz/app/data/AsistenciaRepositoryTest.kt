@@ -37,30 +37,32 @@ class AsistenciaRepositoryTest {
     }
 
     @Test
-    fun guardarYLeerDevuelveLosMismosEstados() = runBlocking {
+    fun guardarAsistenciaYLeerDevuelveLosMismosEstados() = runBlocking {
         val estados = mapOf(
             "E3A-1" to EstadoAsistencia.PRESENTE,
             "E3A-2" to EstadoAsistencia.AUSENTE
         )
 
-        repo.guardar("C3A", "2026-10-01", estados, docente, "Asistencia 3° Básico A, 2026-10-01")
+        repo.guardarAsistencia("C3A", "2026-10-01", estados, docente, "Asistencia 3° Básico A, 2026-10-01")
 
-        assertEquals(estados, repo.asistenciaGuardada("C3A", "2026-10-01"))
+        val leidos = repo.obtenerAsistencia("C3A", "2026-10-01")
+            .associate { it.estudianteId to it.estado }
+
+        assertEquals(estados, leidos)
     }
 
-
     @Test
-    fun guardarDosVecesNoDuplicaYConservaElId() = runBlocking {
+    fun guardarAsistenciaDosVecesNoDuplicaYConservaElId() = runBlocking {
         val fecha = "2026-10-01"
         val detalle = "Asistencia 3° Básico A, $fecha"
-        repo.guardar(
+        repo.guardarAsistencia(
             "C3A", fecha,
             mapOf("E3A-1" to EstadoAsistencia.PRESENTE, "E3A-2" to EstadoAsistencia.PRESENTE),
             docente, detalle
         )
         val primeros = db.asistenciaDao().delCursoEnFecha("C3A", fecha)
 
-        val accion = repo.guardar(
+        val accion = repo.guardarAsistencia(
             "C3A", fecha,
             mapOf("E3A-1" to EstadoAsistencia.PRESENTE, "E3A-2" to EstadoAsistencia.AUSENTE),
             docente, detalle
@@ -77,8 +79,8 @@ class AsistenciaRepositoryTest {
     fun cadaGuardadoDejaUnaAuditoriaConLaFirmaDelUsuario() = runBlocking {
         val fecha = "2026-10-01"
         val detalle = "Asistencia 3° Básico A, $fecha"
-        repo.guardar("C3A", fecha, mapOf("E3A-1" to EstadoAsistencia.PRESENTE), docente, detalle)
-        repo.guardar("C3A", fecha, mapOf("E3A-1" to EstadoAsistencia.AUSENTE), docente, detalle)
+        repo.guardarAsistencia("C3A", fecha, mapOf("E3A-1" to EstadoAsistencia.PRESENTE), docente, detalle)
+        repo.guardarAsistencia("C3A", fecha, mapOf("E3A-1" to EstadoAsistencia.AUSENTE), docente, detalle)
 
         val auditoria = repo.auditoria.first()
 
@@ -96,11 +98,12 @@ class AsistenciaRepositoryTest {
 
         val primera = Room.databaseBuilder(context, AppDatabase::class.java, nombre).build()
         AsistenciaRepository(primera)
-            .guardar("C3A", "2026-10-01", estados, docente, "Asistencia 3° Básico A, 2026-10-01")
+            .guardarAsistencia("C3A", "2026-10-01", estados, docente, "Asistencia 3° Básico A, 2026-10-01")
         primera.close()
 
         val segunda = Room.databaseBuilder(context, AppDatabase::class.java, nombre).build()
-        val leidos = AsistenciaRepository(segunda).asistenciaGuardada("C3A", "2026-10-01")
+        val leidos = AsistenciaRepository(segunda).obtenerAsistencia("C3A", "2026-10-01")
+            .associate { it.estudianteId to it.estado }
         segunda.close()
         context.deleteDatabase(nombre)
 
