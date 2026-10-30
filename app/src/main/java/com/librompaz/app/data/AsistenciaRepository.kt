@@ -66,7 +66,7 @@ class AsistenciaRepository(private val db: AppDatabase) {
             fechaHora = momento
         )
 
-        db.guardarConAuditoria(registros, auditoria, cursoId, fecha)
+        db.guardarConAuditoria(registros, auditoria)
         return accion
     }
 

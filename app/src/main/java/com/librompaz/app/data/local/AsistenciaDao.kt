@@ -10,9 +10,6 @@ interface AsistenciaDao {
     @Query("SELECT * FROM asistencias WHERE cursoId = :cursoId AND fecha = :fecha")
     suspend fun delCursoEnFecha(cursoId: String, fecha: String): List<AsistenciaEntity>
 
-    @Query("DELETE FROM asistencias WHERE cursoId = :cursoId AND fecha = :fecha")
-    suspend fun eliminarDelCursoEnFecha(cursoId: String, fecha: String)
-
     @Upsert
     suspend fun guardar(registros: List<AsistenciaEntity>)
 

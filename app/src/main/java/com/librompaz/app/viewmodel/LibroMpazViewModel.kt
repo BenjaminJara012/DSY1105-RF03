@@ -288,6 +288,7 @@ class LibroMpazViewModel(
     /**
      * Guarda o corrige la asistencia y genera un registro de auditoría.
      */
+
     fun guardarAsistencia(
         cursoId: String,
         fecha: String,
@@ -356,18 +357,15 @@ class LibroMpazViewModel(
 
             database.guardarConAuditoria(
                 entidadesAsistencia,
-                entidadAuditoria,
-                cursoId,
-                fecha
+                entidadAuditoria
             )
 
             _asistencias.value = _asistencias.value
                 .filterNot { it.cursoId == cursoId && it.fecha == fecha } +
                     nuevosRegistros
-
-            _auditoria.value = _auditoria.value + nuevoRegistroAuditoria
         }
     }
+
 
     /**
      * Calcula el porcentaje de asistencia del curso.
