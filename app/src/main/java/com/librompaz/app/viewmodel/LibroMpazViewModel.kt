@@ -24,6 +24,8 @@ import com.librompaz.app.util.validarFechaAsistencia
 import com.librompaz.app.data.AsistenciaRepository
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * ViewModel único, compartido por todas las pantallas (se crea una sola vez en AppNavigation).
@@ -499,8 +501,13 @@ class LibroMpazViewModel(
     // Módulo "Panel administrativo" (Dirección) y auditoría
     // =====================================================================
 
-    private val _auditoria = MutableStateFlow(MockData.auditoria)
-    val auditoria: StateFlow<List<RegistroAuditoria>> = _auditoria.asStateFlow()
+    // Observa la auditoría real de Room y actualiza la pantalla de Dirección.
+    val auditoria: StateFlow<List<RegistroAuditoria>> =
+        asistenciaRepository?.auditoria?.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        ) ?: MutableStateFlow(MockData.auditoria)
 
     /**
      * TODO(equipo): calcular las métricas consolidadas de cada curso (asistencia, sesiones,
