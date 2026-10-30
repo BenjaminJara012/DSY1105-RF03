@@ -1,139 +1,233 @@
-# Libro MPAZ — Proyecto base (Sección DSY1105-005, Maipú)
+# Libro MPAZ — Libro Digital de Clases Interactivo
 
-Proyecto Android base para el caso de Vinculación con el Medio **"Libro Digital de Clases Interactivo 'Libro MPAZ' - Mpazbook"** de la Escuela Escritora Marcela Paz. Es el punto de partida común de todos los equipos de la sección: trae la estructura, las pantallas de cada módulo y perfil, la navegación y la persistencia y la API configuradas. **La lógica de negocio del caso no está implementada**: esa es la parte que construye cada equipo.
+**Proyecto Android | DSY1105-005 | Duoc UC, sede Maipú**
 
-Documentación del caso (carpeta `docs/`):
+## Descripción del proyecto
 
-- `Requerimientos_DSY1105-005.pdf`: requerimientos funcionales, reglas de negocio, RNF y supuestos.
-- `Consultas_Pendientes_DSY1105-005.pdf`: preguntas abiertas al CITT (Christian Lazcano). No resolver con supuestos propios.
+Libro MPAZ (Mpazbook) es una aplicación Android desarrollada para el caso de Vinculación con el Medio de la Escuela Escritora Marcela Paz.
 
-## Cómo abrir y ejecutar
+Su objetivo es apoyar la gestión académica mediante un libro de clases digital, con funcionalidades diferenciadas según los perfiles de usuario: Docente, UTP, Inspectoría y Dirección.
 
-1. Descomprimir el ZIP en una carpeta limpia.
-2. Android Studio → **File > Open…** → seleccionar la carpeta que contiene `settings.gradle.kts`.
-3. Esperar el Gradle Sync (la primera vez necesita internet).
-4. Ejecutar ▶ **Run 'app'**.
-5. En el login, usar **"Modo desarrollo"** para entrar con cualquiera de los cuatro perfiles (el login real es tarea del equipo).
+El proyecto utiliza una plantilla académica común, sobre la cual el equipo ha desarrollado funcionalidades de negocio, validaciones, persistencia local e integración entre las distintas capas de la aplicación.
 
-Si Android Studio sugiere actualizar Gradle o el Android Gradle Plugin, **no aceptar**: las versiones están fijadas para que todos los equipos usen exactamente las mismas.
+## Tecnologías utilizadas
 
-Usuarios de prueba (en `data/MockData.kt`, para cuando implementen el login):
+- **Lenguaje:** Kotlin 2.0.
+- **Interfaz:** Jetpack Compose y Material 3.
+- **Arquitectura:** MVVM.
+- **Gestión de estado:** ViewModel y StateFlow.
+- **Navegación:** Navigation Compose.
+- **Persistencia local:** Room con KSP.
+- **Otras tecnologías configuradas:** DataStore, Retrofit y Gson.
+- **Control de versiones:** Git y GitHub.
+- **Entorno de desarrollo:** Android Studio.
+- **Compilación:** Gradle.
 
-| Perfil | Usuario | Clave |
-|---|---|---|
-| Docente (Matemática 3°A y 4°A) | docente.mat@libromp.cl | docente123 |
-| Docente (Lenguaje 4°A) | docente.len@libromp.cl | docente123 |
-| UTP | utp@libromp.cl | utp123 |
-| Inspectoría | inspectoria@libromp.cl | inspectoria123 |
-| Dirección | direccion@libromp.cl | direccion123 |
+## Arquitectura
 
-## Stack (exigido por el caso)
+La aplicación utiliza el patrón MVVM, separando las responsabilidades de presentación, lógica y acceso a datos.
 
-Kotlin 2.0 · Jetpack Compose · Material 3 · MVVM (ViewModel + StateFlow) · Navigation Compose · **Room obligatorio** (con KSP) y DataStore · Retrofit + Gson. Todas las dependencias están configuradas en Gradle.
+**Flujo del módulo de asistencia:**
 
-El caso tiene además estas restricciones:
+`AsistenciaScreen → LibroMpazViewModel → AsistenciaRepository → Room`
 
-- **Recursos del teléfono:** no permite usar GPS, cámara, grabadora de voz ni biometría.
-- **Acceso:** no existe ningún acceso para estudiantes ni apoderados.
-- **Envíos:** la app no envía notificaciones, correos, SMS ni WhatsApp.
+- **View:** presenta los estudiantes, estados de asistencia y mensajes al usuario.
+- **ViewModel:** administra el estado mediante StateFlow, valida las operaciones y coordina las solicitudes.
+- **Repository:** centraliza las operaciones de lectura y escritura de asistencia.
+- **Room:** almacena los registros de asistencia y auditoría de forma persistente.
 
-## Flujo de pantallas
+## Funcionalidad implementada: RF-03 — Registro de asistencia
 
-```
-LOGIN ──(según perfil)──┬─> DOCENTE: Mis cursos ──> Curso ──┬─> Asistencia del día
-                        │                                   ├─> Registro de clase (OA y contenidos)
-                        │                                   ├─> Calificaciones
-                        │                                   └─> Hoja de vida
-                        ├─> UTP: Panel ──> Cobertura curricular | Revisión de calificaciones
-                        ├─> INSPECTORÍA: Panel ──> Asistencia (cualquier curso) | Alertas
-                        └─> DIRECCIÓN: Panel ──> Auditoría
-Cerrar sesión (cualquier perfil) ──> LOGIN
-```
+El módulo permite al docente registrar la asistencia diaria de los estudiantes de sus cursos.
 
-El botón atrás nativo de Android funciona solo (lo maneja el NavHost). La flecha "←" de la barra superior hace lo mismo. Al ingresar, el login sale de la pila; "Cerrar sesión" la limpia completa.
+### Estados disponibles
 
-## Estructura del código (`app/src/main/java/com/librompaz/app/`)
-
-| Carpeta | Contenido |
+| Estado | Abreviatura |
 |---|---|
-| `model/` | `Curso`, `Asignatura`, `Estudiante`, `CargaDocente`, `RegistroAsistencia`, `ObjetivoAprendizaje`, `SesionClase`, `Evaluacion`, `Calificacion`, `Anotacion`, `RegistroAuditoria`, `ResumenCurso`, `Usuario`, `Perfil` y sus enums. Corresponden a las entidades del caso. |
-| `data/` | `MockData.kt`: datos 100 % ficticios. |
-| `data/local/` | `PersistenciaPendiente.kt`: guía de qué entidades, DAOs y base de datos crear con Room. |
-| `data/remote/` | `ApiPendiente.kt`: guía para el consumo de la API REST con Retrofit. |
-| `viewmodel/` | `LibroMpazViewModel`: un solo ViewModel compartido. Todas las funciones pendientes están marcadas con `TODO(equipo)`. |
-| `navigation/` | `AppNavigation`: rutas, NavHost, ingreso por perfil y cierre de sesión. |
-| `ui/components/` | `BarraSuperior` (flecha atrás y cerrar sesión) y `SelectorDesplegable` (lista desplegable reutilizable). |
-| `ui/screen/` | `LoginScreen` y una carpeta por perfil: `docente/`, `utp/`, `inspectoria/`, `direccion/`, más `comun/` con la asistencia, compartida por Docente e Inspectoría. |
-| `util/` | `Fechas.kt`: fecha de hoy para los formularios. |
-| `ui/theme/` y `res/` | Tema, colores, logo e ícono **provisionales**. |
+| Presente | P |
+| Ausente | A |
+| Atrasado | T |
+| Justificado | J |
 
-## Trazabilidad: requerimiento → pantalla → función a implementar
+### Características
 
-| Módulo | Requerimiento | Pantalla (ya construida) | Función en el ViewModel (TODO del equipo) |
-|---|---|---|---|
-| Autenticación y roles | Autenticar al usuario | `LoginScreen` | `login()` |
-| Autenticación y roles | El docente solo ve sus cursos y asignaturas (RBAC) | `MisCursosScreen` | `misCargas()` |
-| Autenticación y roles | Capacidades distintas por rol | `AppNavigation` (cada perfil tiene su propio flujo) | `login()` |
-| Asistencia | Registrar la asistencia diaria (P / A / T / J) | `AsistenciaScreen` | `asistenciaGuardada()`, `guardarAsistencia()` |
-| Asistencia | Registro en menos de un minuto | `AsistenciaScreen` (todos parten "presente") | — |
-| Asistencia | Inspectoría consulta y gestiona la asistencia general | `PanelInspectoriaScreen`, `AsistenciaScreen` | `porcentajeAsistencia()`, `inasistenciasReiteradas()` |
-| Cobertura curricular | Asociar OA y contenidos a cada sesión | `RegistroClaseScreen` | `guardarSesion()` |
-| Cobertura curricular | UTP ve la cobertura por curso | `CoberturaCurricularScreen` | `oasTrabajados()` |
-| Calificaciones | Registrar notas con instrumento y fecha | `CalificacionesScreen` | `crearEvaluacion()`, `validarNota()`, `guardarCalificaciones()` |
-| Calificaciones | UTP detecta desfases u omisiones | `RevisionCalificacionesScreen` | `desfasesCalificaciones()` |
-| Hoja de vida | Anotaciones con marca temporal y firma del responsable | `HojaDeVidaScreen` | `registrarAnotacion()` |
-| Hoja de vida | Inspectoría identifica riesgo e intervenciones | `AlertasInspectoriaScreen` | `anotacionesQueRequierenIntervencion()`, `inasistenciasReiteradas()` |
-| Panel administrativo | Dirección ve el estado global por curso | `PanelDireccionScreen` | `resumenPorCurso()` |
-| Auditoría | Registro automático de usuario, fecha y hora de cada cambio | `AuditoriaScreen` | En cada función que guarda |
-| Persistencia | Room (obligatorio) | — | ver `data/local/PersistenciaPendiente.kt` |
+- Selección de curso y fecha.
+- Calendario nativo para seleccionar la fecha.
+- Registro individual de asistencia.
+- Contadores de estudiantes según su estado.
+- Confirmación antes de guardar.
+- Validación de fechas.
+- Validación de permisos del docente.
+- Validación de estudiantes pertenecientes al curso.
+- Mensajes de éxito y error.
+- Bloqueo de controles durante las operaciones.
+- Recuperación de registros previamente guardados.
+- Modificación de asistencia existente.
+- Persistencia mediante Room.
+- Registro de auditoría asociado a las operaciones de guardado.
 
-**Reglas de negocio que el equipo debe hacer cumplir:**
+### Persistencia y auditoría
 
-- Ningún estudiante ni apoderado tiene acceso de ningún tipo a la aplicación.
-- Toda creación o modificación queda auditada (usuario, fecha y hora) de forma automática e inalterable.
-- Se pide confirmación antes de cualquier acción que sobrescriba o borre un registro. Las pantallas de asistencia, notas y hoja de vida ya muestran el diálogo.
+El módulo utiliza Room para almacenar la asistencia localmente.
 
-Para ver todo lo pendiente: **Edit > Find > Find in Files** (Ctrl+Shift+F / Cmd+Shift+F) y buscar `TODO(equipo)`.
+Las operaciones de guardado se realizan mediante el Repository y contemplan el registro de auditoría dentro de una transacción de base de datos.
 
-## Qué pasa hoy al ejecutar la app (es intencional)
+La auditoría permite conservar información sobre el usuario responsable, la acción realizada y la fecha y hora correspondiente.
 
-- **Ingresar:** el login siempre rechaza. Hay que entrar con "Modo desarrollo".
-- **Mis cursos:** el docente ve también los cursos de otros docentes.
-- **Guardar:** asistencia, clases, evaluaciones, notas y anotaciones muestran la confirmación, pero no guardan nada.
-- **Vistas de UTP, Inspectoría y Dirección:** las métricas aparecen como "—", la cobertura aparece toda pendiente y las alertas aparecen vacías.
-- **Auditoría:** solo muestra los registros de ejemplo.
+Además, la base de datos incorpora registros iniciales ficticios para facilitar la demostración y las pruebas.
 
-## Orden sugerido de trabajo
+## Instalación y ejecución
 
-1. **Login y RBAC:** validar campos vacíos y credenciales, y que cada docente vea solo sus cargas.
-2. **Asistencia:** guardar y cargar la asistencia del día, con auditoría.
-3. **Registro de clase:** guardar los OA y contenidos de cada sesión.
-4. **Calificaciones:** crear evaluaciones y validar y guardar notas.
-5. **Hoja de vida:** registrar anotaciones con firma.
-6. **Vistas de supervisión:**
-   - UTP: cobertura y desfases.
-   - Inspectoría: porcentaje de asistencia y alertas.
-   - Dirección: métricas por curso.
-7. **Persistencia:** reemplazar `MockData` por Room (obligatorio), con auditoría en la misma transacción.
-8. **Cierre:**
-   - Quitar el "Modo desarrollo".
-   - Revisar que no quede ningún `TODO(equipo)`.
-   - Reemplazar el logo y los colores provisionales.
+### Requisitos
 
-## Reglas del proyecto
+- Android Studio.
+- JDK compatible con el proyecto.
+- Android SDK configurado.
+- Conexión a internet para descargar las dependencias iniciales.
+- Emulador Android o dispositivo físico compatible.
 
-- **Datos:** solo ficticios y sintéticos, sin nombres, RUT, antecedentes reales ni diagnósticos PIE (Ley 19.628 y Ley 21.719).
-- **Repositorio:**
-  - Repositorio **PRIVADO** en GitHub y tablero Trello.
-  - Un integrante sube esta base como commit inicial.
-  - Después, una rama por funcionalidad (por ejemplo `feature/asistencia`).
-  - Debe haber commits de **ambos** integrantes.
-- **Entrega:** APK firmado en modo release.
-- **Consultas sobre el caso:** van por el canal Estudiante → Docente → CITT → organización.
+### Pasos
 
-## Logo e ícono
+1. Clonar el repositorio:
 
-Son **provisionales** (un libro de clases con un check). Para usar el logo oficial:
+   ```bash
+   git clone https://github.com/BenjaminJara012/DSY1105-RF03.git
+   ```
 
-- **Logo:** copiar el PNG a `res/drawable/logo_app.png` y borrar `logo_app.xml`.
-- **Ícono de la app:** clic derecho en `res` > **New > Image Asset**.
+2. Abrir Android Studio.
+3. Seleccionar **File → Open**.
+4. Abrir la carpeta del repositorio que contiene `settings.gradle.kts`.
+5. Esperar a que termine la sincronización de Gradle.
+6. Seleccionar un emulador o dispositivo Android.
+7. Ejecutar la configuración `app`.
+
+**Importante:** no actualizar automáticamente Gradle ni Android Gradle Plugin, ya que el proyecto utiliza versiones definidas en la plantilla académica.
+
+### Compilación y pruebas
+
+Desde la terminal, en la raíz del proyecto:
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+Ejecutar las pruebas unitarias:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+Ambos comandos se ejecutaron correctamente durante la integración del RF-03.
+
+## Pruebas realizadas
+
+### Pruebas automatizadas
+
+- Compilación de la aplicación: **BUILD SUCCESSFUL**.
+- Pruebas unitarias: **BUILD SUCCESSFUL**.
+- Pruebas de persistencia y transacciones Room realizadas durante el desarrollo del Repository.
+
+### Pruebas funcionales
+
+El módulo de asistencia fue probado en un dispositivo físico Samsung.
+
+Se verificó:
+
+- Registro de asistencia con los cuatro estados.
+- Guardado de los registros.
+- Recuperación de asistencia al cambiar de fecha.
+- Persistencia de los datos al cerrar y abrir la aplicación.
+- Modificación de asistencia previamente registrada.
+- Visualización de mensajes y comportamiento de los controles.
+
+## Estructura principal del proyecto
+
+```text
+app/src/main/java/com/librompaz/app/
+├── data/
+│   ├── MockData.kt
+│   ├── AsistenciaRepository.kt
+│   ├── local/
+│   │   ├── AppDatabase.kt
+│   │   ├── AsistenciaDao.kt
+│   │   ├── AsistenciaEntity.kt
+│   │   ├── AuditoriaDao.kt
+│   │   └── AuditoriaEntity.kt
+│   └── remote/
+├── model/
+├── navigation/
+│   └── AppNavigation.kt
+├── ui/
+│   ├── components/
+│   ├── screen/
+│   │   ├── comun/
+│   │   │   └── AsistenciaScreen.kt
+│   │   ├── docente/
+│   │   ├── utp/
+│   │   ├── inspectoria/
+│   │   └── direccion/
+│   └── theme/
+├── util/
+│   └── Fechas.kt
+├── viewmodel/
+│   └── LibroMpazViewModel.kt
+└── MainActivity.kt
+```
+
+## Perfiles y navegación
+
+El proyecto contempla cuatro perfiles:
+
+| Perfil | Funcionalidades previstas |
+|---|---|
+| Docente | Cursos, asistencia, registro de clases, calificaciones y hoja de vida. |
+| UTP | Cobertura curricular y revisión de calificaciones. |
+| Inspectoría | Consulta de asistencia y alertas. |
+| Dirección | Panel administrativo y auditoría. |
+
+La disponibilidad definitiva de cada funcionalidad depende del alcance implementado por el equipo.
+
+## Reglas de negocio y restricciones
+
+- Los estudiantes y apoderados no tienen acceso a la aplicación.
+- Las operaciones de creación y modificación deben registrar auditoría.
+- Las acciones que sobrescriben registros requieren confirmación.
+- No se utilizan GPS, cámara, grabadora de voz ni biometría.
+- La aplicación no envía notificaciones, correos, SMS ni mensajes de WhatsApp.
+- Solo se utilizan datos ficticios o sintéticos, respetando las restricciones de privacidad establecidas en el caso.
+
+## Organización del equipo
+
+El trabajo se distribuyó en ramas de Git según las responsabilidades de cada integrante.
+
+| Integrante | Responsabilidad |
+|---|---|
+| Integrante 1 | Autenticación, navegación y permisos. |
+| Integrante 2 | Persistencia local con Room, Repository y datos iniciales. |
+| Integrante 3 | Lógica RF-03, ViewModel, StateFlow y validaciones. |
+| Integrante 4 | Interfaz RF-03 con Jetpack Compose e integración visual. |
+
+Los cambios se integran mediante Pull Requests, revisión de código y pruebas de compilación.
+
+## Documentación del caso
+
+La carpeta `docs/` contiene:
+
+- `Requerimientos_DSY1105-005.pdf`: requerimientos funcionales, reglas de negocio, requisitos no funcionales y supuestos.
+- `Consultas_Pendientes_DSY1105-005.pdf`: consultas pendientes de resolución por el canal oficial.
+
+Las consultas abiertas no deben resolverse mediante supuestos propios.
+
+## Estado del proyecto
+
+**RF-03 — Registro de asistencia:** implementado, integrado en `main` y probado.
+
+**Autenticación y permisos:** pendiente de confirmación de integración final.
+
+Las demás funcionalidades deben verificarse individualmente antes de declararlas terminadas.
+
+## Entrega
+
+La entrega debe cumplir los requisitos establecidos por el docente, incluido el APK firmado en modo release cuando corresponda.
+
+El repositorio contiene el código fuente y el historial de trabajo colaborativo del equipo.
