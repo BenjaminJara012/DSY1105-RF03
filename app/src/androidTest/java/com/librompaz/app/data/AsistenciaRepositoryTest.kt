@@ -15,6 +15,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertTrue
+import android.database.sqlite.SQLiteConstraintException
+import com.librompaz.app.data.local.AsistenciaEntity
+import com.librompaz.app.data.local.AuditoriaEntity
 
 @RunWith(AndroidJUnit4::class)
 class AsistenciaRepositoryTest {
@@ -108,5 +111,23 @@ class AsistenciaRepositoryTest {
         context.deleteDatabase(nombre)
 
         assertEquals(estados, leidos)
+    }
+
+
+    @Test
+    fun siFallaLaAuditoriaNoQuedaLaAsistenciaGuardada() = runBlocking {
+        val auditoria = AuditoriaEntity("AU-1", "Docente", "DOCENTE", "CREAR", "detalle", "2026-10-01 08:05")
+        db.auditoriaDao().insertar(auditoria)
+        val registro = AsistenciaEntity("A-1", "E3A-1", "C3A", "2026-10-01", "PRESENTE", "Docente", "2026-10-01 08:05")
+
+        val fallo = try {
+            db.guardarConAuditoria(listOf(registro), auditoria)
+            false
+        } catch (e: SQLiteConstraintException) {
+            true
+        }
+
+        assertTrue(fallo)
+        assertEquals(0, db.asistenciaDao().delCursoEnFecha("C3A", "2026-10-01").size)
     }
 }

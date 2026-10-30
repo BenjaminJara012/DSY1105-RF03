@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 
 @Database(
     entities = [AsistenciaEntity::class, AuditoriaEntity::class],
@@ -15,11 +16,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun asistenciaDao(): AsistenciaDao
     abstract fun auditoriaDao(): AuditoriaDao
 
-    @androidx.room.Transaction
-    open suspend fun guardarConAuditoria(
+    suspend fun guardarConAuditoria(
         registros: List<AsistenciaEntity>,
         auditoria: AuditoriaEntity
-    ) {
+    ) = withTransaction {
         asistenciaDao().guardar(registros)
         auditoriaDao().insertar(auditoria)
     }
