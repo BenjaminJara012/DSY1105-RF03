@@ -32,6 +32,11 @@ import com.librompaz.app.model.EstadoAsistencia
 import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.util.hoy
 import com.librompaz.app.viewmodel.LibroMpazViewModel
+import android.app.DatePickerDialog
+import androidx.compose.ui.platform.LocalContext
+import java.util.Calendar
+import java.util.Locale
+
 
 /**
  * Módulo "Asistencia": registro diario del curso con cuatro estados (P presente, A ausente,
@@ -51,6 +56,52 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     val estudiantes = viewModel.estudiantesDelCurso(cursoId)
 
     var fecha by remember { mutableStateOf(hoy()) }
+    val context = LocalContext.current
+
+    /**
+     * Abre el calendario nativo de Android.
+     *
+     * Permite seleccionar una fecha de asistencia
+     * sin tener que escribirla manualmente.
+     * No permite seleccionar fechas futuras.
+     */
+    fun mostrarCalendario() {
+
+        // Recuperamos la fecha que aparece actualmente.
+        val partes = fecha.split("-")
+
+        val calendario = Calendar.getInstance().apply {
+            set(
+                partes[0].toInt(),
+                partes[1].toInt() - 1,
+                partes[2].toInt()
+            )
+        }
+
+        // Creamos el selector de fecha de Android.
+        DatePickerDialog(
+            context,
+            { _, anio, mes, dia ->
+
+                // Convertimos la fecha al formato yyyy-MM-dd.
+                fecha = String.format(
+                    Locale.ROOT,
+                    "%04d-%02d-%02d",
+                    anio,
+                    mes + 1,
+                    dia
+                )
+            },
+            calendario.get(Calendar.YEAR),
+            calendario.get(Calendar.MONTH),
+            calendario.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+
+            // Impide seleccionar días posteriores a hoy.
+            datePicker.maxDate = System.currentTimeMillis()
+
+        }.show()
+    }
     var estados by remember(cursoId, fecha) {
         mutableStateOf(viewModel.asistenciaGuardada(cursoId.orEmpty(), fecha))
     }
@@ -64,11 +115,14 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            OutlinedTextField(
-                value = fecha,
-                onValueChange = { fecha = it },
-                label = { Text("Fecha (AAAA-MM-DD)") },
+            OutlinedTextField(value = fecha, onValueChange = {},
+                readOnly = true, label = { Text("Fecha de asistencia") },
                 singleLine = true,
+                // Botón que abre el calendario nativo.
+                trailingIcon = { TextButton(onClick = { mostrarCalendario() }
+                    ) { Text("Elegir") }
+                },
+
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
