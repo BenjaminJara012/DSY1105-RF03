@@ -112,6 +112,28 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     var estados by remember(cursoId, fecha) {
         mutableStateOf(viewModel.asistenciaGuardada(cursoId.orEmpty(), fecha))
     }
+
+    /**
+     * Calcula la cantidad de estudiantes por estado.
+     * Los estudiantes sin selección explícita
+     * se consideran presentes por defecto.
+     */
+    val presentes = estudiantes.count {
+        (estados[it.id] ?: EstadoAsistencia.PRESENTE) ==
+                EstadoAsistencia.PRESENTE
+    }
+
+    val ausentes = estudiantes.count {
+        estados[it.id] == EstadoAsistencia.AUSENTE
+    }
+
+    val atrasados = estudiantes.count {
+        estados[it.id] == EstadoAsistencia.ATRASADO
+    }
+
+    val justificados = estudiantes.count {
+        estados[it.id] == EstadoAsistencia.JUSTIFICADO
+    }
     var confirmando by remember { mutableStateOf(false) }
     var mensaje by remember { mutableStateOf<String?>(null) }
 
@@ -138,6 +160,22 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 "P = presente · A = ausente · T = atrasado · J = justificado",
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            /**
+             * Resumen visual de la asistencia.
+             * Se actualiza al cambiar los estados.
+             */
+            Text(
+                text = "Presentes: $presentes  |  Ausentes: $ausentes",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            Text(
+                text = "Atrasados: $atrasados  |  Justificados: $justificados",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
             LazyColumn(
