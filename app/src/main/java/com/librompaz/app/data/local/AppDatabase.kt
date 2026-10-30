@@ -18,8 +18,11 @@ abstract class AppDatabase : RoomDatabase() {
 
     suspend fun guardarConAuditoria(
         registros: List<AsistenciaEntity>,
-        auditoria: AuditoriaEntity
+        auditoria: AuditoriaEntity,
+        cursoId: String,
+        fecha: String
     ) = withTransaction {
+        asistenciaDao().eliminarDelCursoEnFecha(cursoId, fecha)
         asistenciaDao().guardar(registros)
         auditoriaDao().insertar(auditoria)
     }

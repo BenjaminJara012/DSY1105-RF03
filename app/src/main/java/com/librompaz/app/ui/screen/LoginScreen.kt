@@ -117,24 +117,18 @@ fun LoginScreen(
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    if (viewModel.login(usuario.trim(), clave)) {
+                    if (if (viewModel.login(usuario = usuario.trim(), clave = clave)) {
+                        true
+                    } else {
+                        false
+                    }
+                    ) {
                         viewModel.usuarioActivo.value?.perfil?.let(onIngresar)
                     }
                 }
             ) { Text("Ingresar") }
 
-            // ---- SOLO PARA DESARROLLO ---- TODO(equipo): eliminar antes de entregar.
-            Text(
-                "Modo desarrollo (entrar sin login):",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Perfil.entries.forEach { perfil ->
-                TextButton(onClick = {
-                    viewModel.entrarModoDesarrollo(perfil)
-                    onIngresar(perfil)
-                }) { Text("Entrar como ${perfil.etiqueta}") }
-            }
+
         }
     }
 }

@@ -22,6 +22,10 @@ import com.librompaz.app.ui.screen.utp.CoberturaCurricularScreen
 import com.librompaz.app.ui.screen.utp.PanelUtpScreen
 import com.librompaz.app.ui.screen.utp.RevisionCalificacionesScreen
 import com.librompaz.app.viewmodel.LibroMpazViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.compose.ui.platform.LocalContext
+import com.librompaz.app.data.local.AppDatabase
 
 object Rutas {
     const val LOGIN = "login"
@@ -63,9 +67,24 @@ object Rutas {
  */
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController(),
-    viewModel: LibroMpazViewModel = viewModel()
+    navController: NavHostController = rememberNavController()
 ) {
+    val context = LocalContext.current
+    val database = AppDatabase.obtener(context.applicationContext)
+
+    val viewModel: LibroMpazViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>
+            ): T {
+                if (modelClass.isAssignableFrom(LibroMpazViewModel::class.java)) {
+                    @Suppress("UNCHECKED_CAST")
+                    return LibroMpazViewModel(database) as T
+                }
+                throw IllegalArgumentException("ViewModel desconocido")
+            }
+        }
+    )
     val cerrarSesion: () -> Unit = {
         viewModel.logout()
         navController.navigate(Rutas.LOGIN) {
