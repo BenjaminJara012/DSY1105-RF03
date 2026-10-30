@@ -1,5 +1,6 @@
 package com.librompaz.app.ui.screen.comun
 
+import androidx.compose.runtime.LaunchedEffect
 import com.librompaz.app.ui.components.MensajeAsistencia
 import com.librompaz.app.ui.components.TipoMensajeAsistencia
 import androidx.compose.animation.animateColorAsState
@@ -43,6 +44,7 @@ import android.app.DatePickerDialog
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import java.util.Locale
+import kotlinx.coroutines.flow.first
 
 
 /**
@@ -61,6 +63,18 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     val cursoId by viewModel.cursoSeleccionadoId.collectAsState()
     val curso = viewModel.cursoPorId(cursoId)
     val estudiantes = viewModel.estudiantesDelCurso(cursoId)
+    // Observa los registros recuperados desde Room.
+
+    // Indica si Room está consultando o guardando información.
+    val cargandoAsistencia by
+    viewModel.cargandoAsistencia.collectAsState()
+
+    // Mensajes reales enviados por el ViewModel.
+    val errorAsistencia by
+    viewModel.errorAsistencia.collectAsState()
+
+    val mensajeAsistencia by
+    viewModel.mensajeAsistencia.collectAsState()
 
     var fecha by remember { mutableStateOf(hoy()) }
     val context = LocalContext.current
@@ -109,9 +123,64 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
 
         }.show()
     }
+
+    /**
+     * Estados que el usuario puede modificar en pantalla.
+     *
+     * Comienzan vacíos y después reciben la información
+     * recuperada desde Room.
+     */
+    /**
+     * Estados que el usuario está visualizando y modificando.
+     *
+     * Se reinician al cambiar de curso o fecha para
+     * no mostrar registros de otra jornada.
+     */
     var estados by remember(cursoId, fecha) {
-        mutableStateOf(viewModel.asistenciaGuardada(cursoId.orEmpty(), fecha))
+        mutableStateOf<Map<String, EstadoAsistencia>>(emptyMap())
     }
+
+    /**
+     * Mantiene bloqueada la pantalla hasta que termine
+     * la consulta inicial de la fecha seleccionada.
+     */
+    var esperandoConsulta by remember(cursoId, fecha) {
+        mutableStateOf(true)
+    }
+
+    /**
+     * Consulta Room al abrir la pantalla o cambiar
+     * el curso o la fecha.
+     */
+    LaunchedEffect(cursoId, fecha) {
+
+        // Inicia la consulta en el ViewModel.
+        viewModel.cargarAsistencia(
+            cursoId.orEmpty(),
+            fecha
+        )
+
+        // Espera a que el ViewModel termine la operación.
+        viewModel.cargandoAsistencia.first { cargando ->
+            !cargando
+        }
+
+        // Recupera los estados de la consulta terminada.
+        estados = viewModel.estadosAsistenciaGuardada.value
+
+        // Permite nuevamente interactuar con la pantalla.
+        esperandoConsulta = false
+    }
+
+    /**
+     * Bloquea controles durante consultas y guardados.
+     */
+    val controlesBloqueados =
+        cargandoAsistencia || esperandoConsulta
+
+
+
+
 
     /**
      * Calcula la cantidad de estudiantes por estado.
@@ -147,8 +216,8 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
             OutlinedTextField(value = fecha, onValueChange = {},
                 readOnly = true, label = { Text("Fecha de asistencia") },
                 singleLine = true,
-                // Botón que abre el calendario nativo.
-                trailingIcon = { TextButton(onClick = { mostrarCalendario() }
+
+                trailingIcon = { TextButton(onClick = { mostrarCalendario() }, enabled = !controlesBloqueados
                     ) { Text("Elegir") }
                 },
 
@@ -193,6 +262,7 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                             BotonEstado(
                                 texto = opcion.abreviatura,
                                 seleccionado = actual == opcion,
+                                habilitado = !controlesBloqueados,
                                 onClick = { estados = estados + (estudiante.id to opcion) }
                             )
                         }
@@ -200,14 +270,29 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 }
             }
 
-            /**
-             * Muestra mensajes informativos relacionados
-             * con el registro de asistencia.
-             */
-            mensaje?.let { texto ->
+            // Indica que Room está realizando una operación.
+            if (controlesBloqueados) {
+                Text(
+                    text = "Procesando asistencia...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            // Muestra errores reales de validación o persistencia.
+            errorAsistencia?.let { error ->
                 MensajeAsistencia(
-                    texto = texto,
-                    tipo = TipoMensajeAsistencia.INFORMATIVO
+                    texto = error,
+                    tipo = TipoMensajeAsistencia.ERROR
+                )
+            }
+
+            // Solo muestra éxito cuando el ViewModel
+            // confirma que Room terminó el guardado.
+            mensajeAsistencia?.let { mensaje ->
+                MensajeAsistencia(
+                    texto = mensaje,
+                    tipo = TipoMensajeAsistencia.EXITO
                 )
             }
 
@@ -215,7 +300,7 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                enabled = estudiantes.isNotEmpty(),
+                enabled = estudiantes.isNotEmpty() && !controlesBloqueados,
                 onClick = { confirmando = true }
             ) { Text("Guardar asistencia") }
         }
@@ -230,9 +315,11 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 TextButton(onClick = {
                     // Los estudiantes que no se tocaron quedan como PRESENTE.
                     val completo = estudiantes.associate { it.id to (estados[it.id] ?: EstadoAsistencia.PRESENTE) }
+                    // Envía los estados al ViewModel para guardarlos en Room.
                     viewModel.guardarAsistencia(cursoId.orEmpty(), fecha, completo)
+                    // Cierra el cuadro de confirmación.
+                    // El resultado real llegará mediante los StateFlow.
                     confirmando = false
-                    mensaje = "Guardado pendiente de integrar con Room."
                 }) { Text("Guardar") }
             },
             dismissButton = {
@@ -258,6 +345,7 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
 private fun BotonEstado(
     texto: String,
     seleccionado: Boolean,
+    habilitado: Boolean,
     onClick: () -> Unit
 ) {
     val colores = MaterialTheme.colorScheme
@@ -290,6 +378,7 @@ private fun BotonEstado(
 
     OutlinedButton(
         onClick = onClick,
+        enabled = habilitado,
         modifier = Modifier
             .padding(start = 4.dp)
             .size(44.dp)
