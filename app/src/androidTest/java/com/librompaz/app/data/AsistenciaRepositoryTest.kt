@@ -130,4 +130,22 @@ class AsistenciaRepositoryTest {
         assertTrue(fallo)
         assertEquals(0, db.asistenciaDao().delCursoEnFecha("C3A", "2026-10-01").size)
     }
+
+
+    @Test
+    fun laBaseNuevaTraeLosDatosIniciales() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val nombre = "prueba_semilla.db"
+        context.deleteDatabase(nombre)
+
+        val base = AppDatabase.construir(context, nombre)
+        val registros = base.asistenciaDao().delCursoEnFecha("C3A", "2026-10-01")
+        val auditoria = base.auditoriaDao().todas().first()
+        base.close()
+        context.deleteDatabase(nombre)
+
+        assertEquals(MockData.asistencias.size, registros.size)
+        assertEquals("AUSENTE", registros.first { it.estudianteId == "E3A-2" }.estado)
+        assertEquals(MockData.auditoria.size, auditoria.size)
+    }
 }
