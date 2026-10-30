@@ -1,7 +1,7 @@
 package com.librompaz.app.ui.screen.comun
 
-
-
+import com.librompaz.app.ui.components.MensajeAsistencia
+import com.librompaz.app.ui.components.TipoMensajeAsistencia
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -200,7 +200,16 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 }
             }
 
-            mensaje?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
+            /**
+             * Muestra mensajes informativos relacionados
+             * con el registro de asistencia.
+             */
+            mensaje?.let { texto ->
+                MensajeAsistencia(
+                    texto = texto,
+                    tipo = TipoMensajeAsistencia.INFORMATIVO
+                )
+            }
 
             Button(
                 modifier = Modifier
@@ -223,7 +232,7 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                     val completo = estudiantes.associate { it.id to (estados[it.id] ?: EstadoAsistencia.PRESENTE) }
                     viewModel.guardarAsistencia(cursoId.orEmpty(), fecha, completo)
                     confirmando = false
-                    mensaje = "Asistencia enviada a guardar (cuando guardarAsistencia() esté implementada)."
+                    mensaje = "Guardado pendiente de integrar con Room."
                 }) { Text("Guardar") }
             },
             dismissButton = {
