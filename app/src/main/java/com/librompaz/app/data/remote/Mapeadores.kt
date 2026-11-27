@@ -13,6 +13,7 @@ import com.librompaz.app.model.RegistroAsistencia
 import com.librompaz.app.model.RegistroAuditoria
 import com.librompaz.app.model.SesionClase
 import com.librompaz.app.model.Usuario
+import com.librompaz.app.model.Perfil
 
 // =====================================================================================
 // Mapeadores DTO <-> entidad (modelo de la app). Los enums viajan por su nombre ("PRESENTE",
@@ -83,5 +84,8 @@ fun RegistroAuditoria.aDto(): AuditoriaDto = TODO("E3-9")
  * escribir (ClaveSegura.hash): permite ingresar sin conexión con las mismas credenciales.
  * Devuelve null si el perfil no es uno de los cuatro definidos (RN-01).
  */
-fun UsuarioDto.aEntidad(claveHash: String): Usuario? = TODO("E3-9: null si el perfil no existe")
+fun UsuarioDto.aEntidad(claveHash: String): Usuario? {
+    val perfilValido = enumONull<Perfil>(perfil) ?: return null
+    return Usuario(id, nombre, usuario, claveHash, perfilValido)
+}
 fun Usuario.aDto(): UsuarioDto = TODO("E3-9")
