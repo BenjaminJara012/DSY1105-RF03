@@ -15,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.librompaz.app.data.MockData
 import org.junit.Assert.assertFalse
+import com.librompaz.app.data.remote.OkDto
 
 /**
  * Pruebas de autenticación contra la API.
@@ -233,6 +234,90 @@ class AutenticacionApiTest {
 
         assertNull(sesion.token)
     }
+
+
+    /**
+     * C51: retirar el token al cerrar sesión.
+     * También comprueba que no se llame al servidor
+     * cuando no existe un token.
+     */
+    @Test
+    fun cerrarSesion_eliminaTokenLocal() = runTest {
+
+        val cache = CacheFalsa()
+        val remota = mockk<FuenteRemota>()
+        val sesion = TokenSesion()
+
+        val repositorio = LibroMpazApiRepository(
+            cache = cache,
+            remota = remota,
+            sesion = sesion
+        )
+
+        // Simulamos una sesión iniciada.
+        sesion.token = "token-de-prueba"
+
+        // Cerramos la sesión local.
+        val tokenRetirado = repositorio.retirarToken()
+
+        // El token anterior se devuelve para el cierre remoto.
+        assertEquals("token-de-prueba", tokenRetirado)
+
+        // La sesión local ya no debe conservarlo.
+        assertNull(sesion.token)
+
+        // Sin token no se realiza ninguna solicitud de cierre.
+        repositorio.cerrarSesionRemota(null)
+
+        coVerify(exactly = 0) {
+            remota.cerrarSesion(any())
+        }
+    }
+
+
+    /**
+     * C51: cuando existe un token,
+     * se solicita el cierre de sesión al servidor.
+     */
+    @Test
+    fun cerrarSesionConToken_avisaAlServidor() = runTest {
+
+        val cache = CacheFalsa()
+        val remota = mockk<FuenteRemota>()
+        val sesion = TokenSesion()
+
+        val repositorio = LibroMpazApiRepository(
+            cache = cache,
+            remota = remota,
+            sesion = sesion
+        )
+
+        // Simulamos una sesión iniciada.
+        sesion.token = "token-de-prueba"
+
+        // Simulamos una respuesta exitosa del servidor.
+        coEvery {
+            remota.cerrarSesion("token-de-prueba")
+        } returns ApiResult.Exito(OkDto(ok = true))
+
+        // Retiramos el token almacenado localmente.
+        val token = repositorio.retirarToken()
+
+        // Solicitamos cerrar la sesión en el servidor.
+        repositorio.cerrarSesionRemota(token)
+
+        // El dispositivo ya no debe conservar el token.
+        assertNull(sesion.token)
+
+        // El servidor debe recibir exactamente una solicitud.
+        coVerify(exactly = 1) {
+            remota.cerrarSesion("token-de-prueba")
+        }
+    }
+
+
+
+
 
 
 
