@@ -1,12 +1,18 @@
 package com.librompaz.app.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 /**
- * Registro de auditoría (entidad "Control de seguridad y trazabilidad" del caso). Regla de
- * negocio: toda creación o modificación queda auditada (usuario, fecha y hora) de forma
- * automática e inalterable.
+ * Registro de auditoría. RN-02: toda creación o modificación queda auditada (usuario, perfil,
+ * acción, detalle, fecha y hora) de forma automática e inalterable.
+ *
+ * Tabla "auditoria". Es INALTERABLE porque su DAO (AuditoriaDao) solo tiene @Insert y consultas:
+ * no existe ninguna función para actualizar ni borrar estas filas.
  */
+@Entity(tableName = "auditoria")
 data class RegistroAuditoria(
-    val id: String,
+    @PrimaryKey val id: String,
     val usuario: String,
     val perfil: Perfil,
     val accion: String,
@@ -15,13 +21,17 @@ data class RegistroAuditoria(
 )
 
 /**
- * Métricas consolidadas de un curso para Dirección. Los valores null significan "todavía no
- * calculado" (ver LibroMpazViewModel.resumenPorCurso()).
+ * Métricas consolidadas de un curso para Dirección (RF-12). NO es una tabla: se calcula a partir
+ * de las otras (ver domain/Metricas.kt). porcentajeAsistencia es null si el curso no tiene registros.
+ *
+ * Consistencia de registros: días con asistencia incompleta y cargas sin clases en la última semana.
  */
 data class ResumenCurso(
     val cursoId: String,
     val porcentajeAsistencia: Int? = null,
-    val sesionesRegistradas: Int? = null,
-    val calificacionesRegistradas: Int? = null,
-    val anotacionesNegativas: Int? = null
+    val sesionesRegistradas: Int = 0,
+    val calificacionesRegistradas: Int = 0,
+    val anotacionesNegativas: Int = 0,
+    val diasAsistenciaIncompleta: Int = 0,
+    val cargasSinClasesRecientes: Int = 0
 )

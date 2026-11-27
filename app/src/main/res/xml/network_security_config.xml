@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Configuración de red de la app (RN-01 y RNF-07: flujo aislado, solo servidores de la red local).
+
+    - Se permite HTTP sin cifrar porque el servidor del aula es local (emulador 10.0.2.2, localhost o
+      una IP privada como 192.168.x.x). El HTTPS hacia cualquier destino sigue funcionando.
+    - El sistema de seguridad de red de Android no admite rangos de IP (no existe "192.168.0.0/16"),
+      por eso no se pueden listar aquí los rangos privados. La restricción a la red local se aplica en
+      el código: ConfigServidor.validarUrl rechaza cualquier dirección que no sea local y
+      RedLocalInterceptor bloquea toda petición cuyo destino no lo sea, antes de abrir la conexión.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

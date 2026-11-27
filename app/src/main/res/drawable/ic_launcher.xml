@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- PROVISIONAL: logo genérico (libro de clases con check) mientras no se cuente con el logo
-     oficial. Para reemplazarlo: copiar el PNG oficial a res/drawable/ con el nombre
-     logo_app.png y borrar este .xml (el código no cambia). -->
+<!-- Logo de demostración: libro de clases con check. Para usar un logo oficial: copiar el PNG a
+     res/drawable/ con el nombre logo_app.png y borrar este .xml (el código no cambia). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"

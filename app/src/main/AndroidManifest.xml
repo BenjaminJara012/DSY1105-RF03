@@ -1,10 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        Permisos:
+        - VIBRATE (nivel "normal": no se pide en pantalla): respuesta háptica.
+        - INTERNET y ACCESS_NETWORK_STATE: solo para hablar con el servidor LOCAL de la red del aula
+          (ver network_security_config y ConfigServidor: la app rechaza cualquier destino que no sea de
+          la red local). No se declaran cámara, micrófono, ubicación, biometría, mensajería ni avisos al
+          sistema: el caso los prohíbe (privacidad y flujo aislado).
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Android 11+: necesario para que la app pueda ubicar el motor de voz (texto a voz) del sistema. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.LibroMpaz">
         <activity

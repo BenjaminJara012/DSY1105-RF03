@@ -1,10 +1,10 @@
 package com.librompaz.app.model
 
 /**
- * Los cuatro perfiles del caso (ver Requerimientos_DSY1105-005, "Actores"). Ningún estudiante
- * ni apoderado tiene acceso a la app (privacidad hermética).
+ * Los cuatro perfiles de la app (RN-01). Ningún estudiante ni apoderado tiene acceso: no existen
+ * perfiles, credenciales ni vistas para ellos.
  *
- * Pendiente con el CITT: si los roles son excluyentes o una persona puede tener más de uno.
+ * Supuesto vigente: los roles son excluyentes; cada usuario tiene uno solo.
  */
 enum class Perfil(val etiqueta: String) {
     DOCENTE("Docente"),

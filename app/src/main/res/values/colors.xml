@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Colores PROVISIONALES (logo e ícono). TODO(equipo): reemplazar por los oficiales
-         y mantenerlos iguales a ui/theme/Theme.kt. -->
+    <!-- Colores de la marca de demostración (logo e ícono). Deben coincidir con ui/theme/Theme.kt. -->
     <color name="marca_azul">#FF283593</color>
     <color name="marca_blanco">#FFFFFFFF</color>
     <color name="marca_verde">#FF2E7D32</color>
