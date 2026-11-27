@@ -1,233 +1,173 @@
-# Libro MPAZ — Libro Digital de Clases Interactivo
+# LibroMpaz — Libro de clases digital (prototipo académico)
 
-**Proyecto Android | DSY1105-005 | Duoc UC, sede Maipú**
+Aplicación Android (Kotlin, Jetpack Compose Material 3, MVVM, Room) que simula el libro de clases digital de un colegio básico. Es un prototipo de uso interno: todos los datos son ficticios y el flujo es aislado: no se envía ni se exporta información fuera del dispositivo o, en modo API, fuera de la red local del aula (RN-01, RNF-07).
 
-## Descripción del proyecto
+La app trae dos modos que se cambian **en tiempo de ejecución**, sin recompilar, con el interruptor "Modo local (sin servidor)" del cuadro **Servidor** (botón en el login):
 
-Libro MPAZ (Mpazbook) es una aplicación Android desarrollada para el caso de Vinculación con el Medio de la Escuela Escritora Marcela Paz.
+| Modo | Qué hace |
+|---|---|
+| Modo local | Todo se guarda en Room (`libro_mpaz_local.db`), sin red, con las mismas reglas de dominio. Funciona completo hoy, sin servidor. |
+| Modo servidor | El servidor local del aula es la fuente de verdad y Room (`libro_mpaz.db`) es la copia local (caché). Depende del código que se completa en los `TODO(E3-n)`. |
 
-Su objetivo es apoyar la gestión académica mediante un libro de clases digital, con funcionalidades diferenciadas según los perfiles de usuario: Docente, UTP, Inspectoría y Dirección.
+**`USAR_API` solo define el valor inicial** del interruptor (`false` = parte en modo local, `true` = parte en modo servidor). Una vez que alguien elige un modo en la app, esa preferencia queda guardada en el dispositivo y manda sobre `USAR_API`. Se lee en cada operación: el cambio es inmediato, pero cierra la sesión actual.
 
-El proyecto utiliza una plantilla académica común, sobre la cual el equipo ha desarrollado funcionalidades de negocio, validaciones, persistencia local e integración entre las distintas capas de la aplicación.
+Franja visible: bajo la barra superior siempre se muestra "Modo local" o "Modo servidor". En la defensa del Parcial debe mostrarse el **modo servidor** (integración con la API); el modo local es solo respaldo.
 
-## Tecnologías utilizadas
+**Datos independientes, sin sincronización.** Los datos creados en modo local viven en su propia base y **no se envían** al servidor al volver a modo servidor (ni al revés). La acción "Restablecer datos locales" del cuadro Servidor (con confirmación) borra la base local y vuelve a cargar los datos de ejemplo. Antes de pasar a modo servidor hay que haber completado los `TODO(E3-n)`; si no, la app avisa en pantalla que falta completar la conexión y se puede volver a modo local.
 
-- **Lenguaje:** Kotlin 2.0.
-- **Interfaz:** Jetpack Compose y Material 3.
-- **Arquitectura:** MVVM.
-- **Gestión de estado:** ViewModel y StateFlow.
-- **Navegación:** Navigation Compose.
-- **Persistencia local:** Room con KSP.
-- **Otras tecnologías configuradas:** DataStore, Retrofit y Gson.
-- **Control de versiones:** Git y GitHub.
-- **Entorno de desarrollo:** Android Studio.
-- **Compilación:** Gradle.
+## Caso
+
+El colegio necesita registrar asistencia, contenidos curriculares (OA), calificaciones y anotaciones de la hoja de vida, con acceso restringido por perfil y con un registro de auditoría inalterable. Cada perfil ve solo lo que le corresponde.
+
+## Perfiles y usuarios de prueba
+
+| Perfil | Usuario | Clave | Qué puede hacer |
+|---|---|---|---|
+| Docente (Matemática) | `docente.mat@libromp.cl` | `docente123` | Ver sus cursos; asistencia, clases con OA, notas y anotaciones solo en sus cargas |
+| Docente (Lenguaje) | `docente.len@libromp.cl` | `docente123` | Igual, con sus propias cargas |
+| UTP | `utp@libromp.cl` | `utp123` | Solo lectura: cobertura curricular y revisión de calificaciones |
+| Inspectoría | `inspectoria@libromp.cl` | `inspectoria123` | Asistencia de todos los cursos (consultar y gestionar), alertas y hoja de vida |
+| Dirección | `direccion@libromp.cl` | `direccion123` | Solo lectura: panel global y auditoría |
+
+Las claves se guardan como hash SHA-256 con sal fija de demostración (no son aptas para producción). El servidor de la Experiencia 3 usa los mismos usuarios.
+
+## Requerimientos
+
+| RF | Descripción | Estado (modo local) | Dónde |
+|---|---|---|---|
+| RF-01 | Login real y cursos asignados | Implementado | `LoginScreen`, `MisCursosScreen`, `LibroMpazViewModel.ingresar/misCargas` |
+| RF-02 | Control de acceso por rol (RBAC) | Implementado | `domain/PoliticaAcceso`, `AppNavigation.protegida`, verificación en cada operación del ViewModel |
+| RF-03 | Registrar asistencia diaria | Implementado | `AsistenciaScreen`, `guardarAsistencia`, `domain/RegistrosAsistencia` |
+| RF-04 | Asistencia en pocos pasos | Implementado | Todos parten presentes, se tocan solo las excepciones, "Todos presentes" |
+| RF-05 | Inspectoría gestiona asistencia general | Implementado | `PanelInspectoriaScreen`, `porcentajesAsistencia` |
+| RF-06 | Asociar OA y contenidos a la sesión | Implementado | `RegistroClaseScreen`, `guardarSesion`, `validarSesion` |
+| RF-07 | UTP revisa cobertura curricular | Implementado | `CoberturaCurricularScreen`, `oasTrabajados`, lectura en voz alta |
+| RF-08 | Calificaciones por instrumento y fecha | Implementado | `CalificacionesScreen`, `crearEvaluacion`, `guardarCalificaciones` |
+| RF-09 | UTP detecta desfases en notas | Implementado | `RevisionCalificacionesScreen`, `calcularDesfases` |
+| RF-10 | Anotaciones en la hoja de vida | Implementado | `HojaDeVidaScreen`, `registrarAnotacion` |
+| RF-11 | Inspectoría detecta riesgos | Implementado | `AlertasInspectoriaScreen`, umbrales en `domain/Metricas` |
+| RF-12 | Dirección ve el estado global | Implementado | `PanelDireccionScreen`, `resumenCursos` |
+| RF-13 | Consultar la auditoría | Implementado | `AuditoriaScreen`, tabla `auditoria` sin actualizar ni borrar |
+
+Reglas de negocio relevantes: RN-03 (docente solo opera en sus cargas), RN-04 (notas de 1,0 a 7,0 con un decimal), RN-05 (una asistencia por estudiante y fecha, índice único e id determinista), RN-06 (anotaciones sin editar ni eliminar: su DAO no tiene `@Update` ni `@Delete`), RN-07 (alertas con 3 o más ausencias y 2 o más anotaciones negativas), RN-08 (una nota por estudiante y evaluación, solo de estudiantes del curso).
+
+Porcentaje de asistencia: (presentes + atrasados) / total de registros x 100, redondeado; sin registros se muestra "—".
+
+## Recursos nativos y permisos
+
+- Texto a voz (`TextToSpeech`): botón "Escuchar resumen" en la cobertura curricular.
+- Vibración (permiso `VIBRATE`): respuesta háptica ante errores y confirmaciones.
+- Red (`INTERNET` y `ACCESS_NETWORK_STATE`): solo para hablar con el servidor local del aula en modo API.
+
+No se usan cámara, micrófono, ubicación, biometría, notificaciones ni intercambio de archivos.
 
 ## Arquitectura
 
-La aplicación utiliza el patrón MVVM, separando las responsabilidades de presentación, lógica y acceso a datos.
-
-**Flujo del módulo de asistencia:**
-
-`AsistenciaScreen → LibroMpazViewModel → AsistenciaRepository → Room`
-
-- **View:** presenta los estudiantes, estados de asistencia y mensajes al usuario.
-- **ViewModel:** administra el estado mediante StateFlow, valida las operaciones y coordina las solicitudes.
-- **Repository:** centraliza las operaciones de lectura y escritura de asistencia.
-- **Room:** almacena los registros de asistencia y auditoría de forma persistente.
-
-## Funcionalidad implementada: RF-03 — Registro de asistencia
-
-El módulo permite al docente registrar la asistencia diaria de los estudiantes de sus cursos.
-
-### Estados disponibles
-
-| Estado | Abreviatura |
-|---|---|
-| Presente | P |
-| Ausente | A |
-| Atrasado | T |
-| Justificado | J |
-
-### Características
-
-- Selección de curso y fecha.
-- Calendario nativo para seleccionar la fecha.
-- Registro individual de asistencia.
-- Contadores de estudiantes según su estado.
-- Confirmación antes de guardar.
-- Validación de fechas.
-- Validación de permisos del docente.
-- Validación de estudiantes pertenecientes al curso.
-- Mensajes de éxito y error.
-- Bloqueo de controles durante las operaciones.
-- Recuperación de registros previamente guardados.
-- Modificación de asistencia existente.
-- Persistencia mediante Room.
-- Registro de auditoría asociado a las operaciones de guardado.
-
-### Persistencia y auditoría
-
-El módulo utiliza Room para almacenar la asistencia localmente.
-
-Las operaciones de guardado se realizan mediante el Repository y contemplan el registro de auditoría dentro de una transacción de base de datos.
-
-La auditoría permite conservar información sobre el usuario responsable, la acción realizada y la fecha y hora correspondiente.
-
-Además, la base de datos incorpora registros iniciales ficticios para facilitar la demostración y las pruebas.
-
-## Instalación y ejecución
-
-### Requisitos
-
-- Android Studio.
-- JDK compatible con el proyecto.
-- Android SDK configurado.
-- Conexión a internet para descargar las dependencias iniciales.
-- Emulador Android o dispositivo físico compatible.
-
-### Pasos
-
-1. Clonar el repositorio:
-
-   ```bash
-   git clone https://github.com/BenjaminJara012/DSY1105-RF03.git
-   ```
-
-2. Abrir Android Studio.
-3. Seleccionar **File → Open**.
-4. Abrir la carpeta del repositorio que contiene `settings.gradle.kts`.
-5. Esperar a que termine la sincronización de Gradle.
-6. Seleccionar un emulador o dispositivo Android.
-7. Ejecutar la configuración `app`.
-
-**Importante:** no actualizar automáticamente Gradle ni Android Gradle Plugin, ya que el proyecto utiliza versiones definidas en la plantilla académica.
-
-### Compilación y pruebas
-
-Desde la terminal, en la raíz del proyecto:
-
-```powershell
-.\gradlew.bat :app:assembleDebug
 ```
-
-Ejecutar las pruebas unitarias:
-
-```powershell
-.\gradlew.bat :app:testDebugUnitTest
-```
-
-Ambos comandos se ejecutaron correctamente durante la integración del RF-03.
-
-## Pruebas realizadas
-
-### Pruebas automatizadas
-
-- Compilación de la aplicación: **BUILD SUCCESSFUL**.
-- Pruebas unitarias: **BUILD SUCCESSFUL**.
-- Pruebas de persistencia y transacciones Room realizadas durante el desarrollo del Repository.
-
-### Pruebas funcionales
-
-El módulo de asistencia fue probado en un dispositivo físico Samsung.
-
-Se verificó:
-
-- Registro de asistencia con los cuatro estados.
-- Guardado de los registros.
-- Recuperación de asistencia al cambiar de fecha.
-- Persistencia de los datos al cerrar y abrir la aplicación.
-- Modificación de asistencia previamente registrada.
-- Visualización de mensajes y comportamiento de los controles.
-
-## Estructura principal del proyecto
-
-```text
-app/src/main/java/com/librompaz/app/
+com.librompaz.app
+├── model/        Entidades Room y tipos (Perfil, Usuario, Curso, Estudiante, Asistencia, Sesion, Evaluacion, Anotacion, Auditoría)
 ├── data/
-│   ├── MockData.kt
-│   ├── AsistenciaRepository.kt
-│   ├── local/
-│   │   ├── AppDatabase.kt
-│   │   ├── AsistenciaDao.kt
-│   │   ├── AsistenciaEntity.kt
-│   │   ├── AuditoriaDao.kt
-│   │   └── AuditoriaEntity.kt
-│   └── remote/
-├── model/
-├── navigation/
-│   └── AppNavigation.kt
+│   ├── remote/       ApiService (Retrofit) y Dtos (completos: son el contrato con la API); ApiClient, Interceptores, ConfigServidor,
+│   │                 ApiResult, ErroresApi, Mapeadores, FuenteRemota y ServidorPreferencias (con TODO)
+│   ├── local/        AppDatabase, DAOs, Converters, CacheLocal/CacheRoom (reemplazo atómico de la copia local)
+│   ├── repository/   LibroMpazDatos (contrato único), SelectorFuente (elige local o servidor por operación), PreferenciaModo, LibroMpazRepository (modo local, completo) y LibroMpazApiRepository (modo servidor, con TODO)
+│   └── MockData.kt   Datos ficticios iniciales (los mismos de la semilla del servidor)
+├── domain/       Reglas puras y testeables: PoliticaAcceso, Validaciones, Metricas, ClaveSegura, RegistrosAsistencia
+├── viewmodel/    LibroMpazViewModel (StateFlow, un solo ViewModel compartido; elige la fuente de datos en cada operación con `SelectorFuente`, según el modo guardado)
 ├── ui/
-│   ├── components/
-│   ├── screen/
-│   │   ├── comun/
-│   │   │   └── AsistenciaScreen.kt
-│   │   ├── docente/
-│   │   ├── utp/
-│   │   ├── inspectoria/
-│   │   └── direccion/
-│   └── theme/
-├── util/
-│   └── Fechas.kt
-├── viewmodel/
-│   └── LibroMpazViewModel.kt
+│   ├── theme/ components/ (campos con validación, avisos, selectores, cuadro "Servidor", banner de conexión)
+│   └── screen/   comun, docente, utp, inspectoria, direccion
+├── navigation/   AppNavigation (un NavHost, rutas protegidas por perfil)
+├── util/         Fechas, Dispositivo (vibración y voz), Conectividad
 └── MainActivity.kt
 ```
 
-## Perfiles y navegación
+Flujo en modo local: la interfaz observa `StateFlow` del ViewModel; el ViewModel valida con `domain`, comprueba permisos con `PoliticaAcceso` y delega la escritura a `LibroMpazRepository`, que guarda y audita en la misma transacción Room.
 
-El proyecto contempla cuatro perfiles:
+Flujo en modo API:
 
-| Perfil | Funcionalidades previstas |
-|---|---|
-| Docente | Cursos, asistencia, registro de clases, calificaciones y hoja de vida. |
-| UTP | Cobertura curricular y revisión de calificaciones. |
-| Inspectoría | Consulta de asistencia y alertas. |
-| Dirección | Panel administrativo y auditoría. |
+- Lectura: API -> `FuenteRemota` -> el repositorio reemplaza la copia local en Room -> la interfaz observa los `Flow` de Room.
+- Escritura: ViewModel (valida y autoriza) -> `LibroMpazApiRepository` -> `FuenteRemota` -> API. Si el servidor acepta, el repositorio vuelve a leer y actualiza Room; si rechaza, se muestra su mensaje; si no hay red, no se guarda nada y se avisa.
 
-La disponibilidad definitiva de cada funcionalidad depende del alcance implementado por el equipo.
+## Cómo ejecutar
 
-## Reglas de negocio y restricciones
+**Modo local (como se entrega).**
 
-- Los estudiantes y apoderados no tienen acceso a la aplicación.
-- Las operaciones de creación y modificación deben registrar auditoría.
-- Las acciones que sobrescriben registros requieren confirmación.
-- No se utilizan GPS, cámara, grabadora de voz ni biometría.
-- La aplicación no envía notificaciones, correos, SMS ni mensajes de WhatsApp.
-- Solo se utilizan datos ficticios o sintéticos, respetando las restricciones de privacidad establecidas en el caso.
+1. Abrir la carpeta `LibroMpaz` con Android Studio (JDK 17, Android SDK 35).
+2. Sincronizar Gradle y ejecutar el módulo `app` en un emulador o dispositivo (minSdk 24).
+3. Iniciar sesión con alguno de los usuarios de la tabla. La base se puebla sola la primera vez.
 
-## Organización del equipo
+**Modo API (Experiencia 3).**
 
-El trabajo se distribuyó en ramas de Git según las responsabilidades de cada integrante.
+1. Completar los `TODO(E3-n)` (tabla más abajo; en Android Studio: View > Tool Windows > TODO).
+2. Descomprimir el servidor (archivo `_Backend.zip` que se entrega aparte) y levantarlo en el computador: `cd backend && npm install && npm start`. Escucha en el puerto 3000.
+3. Ejecutar la app y, en el login, abrir **Servidor** y desactivar "Modo local (sin servidor)" (o poner `USAR_API=true` en `gradle.properties` para que parta en modo servidor en una instalación nueva).
+4. Dirección del servidor: en el emulador, `http://10.0.2.2:3000/` (valor por defecto del build); en un teléfono, `http://<IP-del-computador>:3000/` desde el botón **Servidor** del login (Probar conexión > Guardar); por USB, `adb reverse tcp:3000 tcp:3000` y `http://localhost:3000/`.
 
-| Integrante | Responsabilidad |
-|---|---|
-| Integrante 1 | Autenticación, navegación y permisos. |
-| Integrante 2 | Persistencia local con Room, Repository y datos iniciales. |
-| Integrante 3 | Lógica RF-03, ViewModel, StateFlow y validaciones. |
-| Integrante 4 | Interfaz RF-03 con Jetpack Compose e integración visual. |
+### Regla de aislamiento (RN-01 y RNF-07): solo red local
 
-Los cambios se integran mediante Pull Requests, revisión de código y pruebas de compilación.
+El caso exige un flujo aislado: asistencia, notas y hoja de vida de menores no pueden salir de la red del aula. Por eso:
 
-## Documentación del caso
+- Solo se usa el emulador (`10.0.2.2`) o la red del aula (IP privada del computador). Está **prohibido** el reenvío público de puertos (por ejemplo, Port Forwarding con visibilidad pública de VS Code), los túneles de internet y publicar el servidor en la nube.
+- La app debe rechazar cualquier dirección que no sea local (TODO E3-3, E3-4, E3-5 y E3-17), y el servidor responde 403 a los reenvíos con encabezados de proxy.
+- Los permisos de red son solo `INTERNET` y `ACCESS_NETWORK_STATE`; no se agrega ningún SDK de terceros, analítica ni mensajería.
+- En la presentación hay que demostrar que no hay tráfico a hosts externos (ver el enunciado).
 
-La carpeta `docs/` contiene:
+## Lo que se completa en la Experiencia 3 (TODO)
 
-- `Requerimientos_DSY1105-005.pdf`: requerimientos funcionales, reglas de negocio, requisitos no funcionales y supuestos.
-- `Consultas_Pendientes_DSY1105-005.pdf`: consultas pendientes de resolución por el canal oficial.
+Cada `TODO(E3-n)` en el código dice qué hacer, en qué archivo y con qué criterio de aceptación. En modo local ningún TODO se ejecuta: la app sigue funcionando completa. Si se activa el modo servidor antes de completarlos, la app lo avisa en pantalla (no se cae) y se puede volver a modo local.
 
-Las consultas abiertas no deben resolverse mediante supuestos propios.
+| TODO | Archivo | Qué hacer | Criterio de aceptación |
+|---|---|---|---|
+| E3-1 | `data/remote/ApiClient.kt` | Crear el OkHttpClient (timeouts 8 s / 15 s / 15 s; interceptores en orden RedLocal, Token, depuración) y un Retrofit con Gson por cada URL base. | Un host no local lanza IOException sin abrir conexión; un host local lleva Authorization Bearer; la misma URL devuelve la misma instancia. |
+| E3-2 | `data/remote/Interceptores.kt (TokenInterceptor)` | Agregar «Authorization: Bearer <token>» cuando hay sesión y la petición no trae ya el encabezado. | Con token «abc» el servidor recibe «Bearer abc»; sin token no recibe el encabezado; el logout no lo duplica. |
+| E3-3 | `data/remote/Interceptores.kt (RedLocalInterceptor)` | RN-01 y RNF-07: lanzar IOException si el host de la petición no es local, antes de abrir ninguna conexión. | https://api.ejemplo.com falla con requestCount = 0 en el servidor simulado; 10.0.2.2, localhost y 192.168.x.x pasan. |
+| E3-4 | `data/remote/ConfigServidor.kt (esHostLocal)` | Devolver true solo para localhost, 127.x, 10.x, 172.16 a 172.31, 192.168.x, 169.254.x, IPv6 local y nombres internos (sin punto, .local, .lan, .internal). | true: localhost, 10.0.2.2, 172.31.255.255, 192.168.1.10, ::1, aula-pc. false: 8.8.8.8, 172.32.0.1, 192.169.0.1, 300.1.1.1, 192.168.1, www.google.com. |
+| E3-5 | `data/remote/ConfigServidor.kt (validarUrl)` | Validar y normalizar la URL escrita con los mensajes de la clase; rechazar todo lo que no sea red local. | «10.0.2.2:3000» da «http://10.0.2.2:3000/»; «https://api.ejemplo.com» da MENSAJE_NO_LOCAL; vacía, ftp://, puerto 99999 y rutas dan su mensaje. |
+| E3-6 | `data/remote/ApiResult.kt` | Completar mapear, obtenerOSalir y mensajeDeFallo de ApiResult. | Exito(2).mapear { it * 3 } es Exito(6); un Error o SinConexion pasa sin cambios; mensajeDeFallo es null en un éxito. |
+| E3-7 | `data/remote/ErroresApi.kt (cuerpo y códigos)` | parsearCuerpoDeError, mensajePorCodigo y traducirRespuestaHttp: textos en español y uso del mensaje y el campo que manda el servidor. | {"error":"…","campo":"bloque"} se conserva con su código; un cuerpo no JSON da null; 401 es MENSAJE_SESION_EXPIRADA. |
+| E3-8 | `data/remote/ErroresApi.kt (llamarApi y probarServidor)` | Ejecutar la llamada y devolver Exito, Error (HTTP o cuerpo mal formado) o SinConexion (red o tiempo agotado); relanzar la CancellationException; probar /health. | 409 da Error con el mensaje del servidor; servidor apagado da SinConexion; timeout da MENSAJE_TIEMPO_AGOTADO; cancelar no produce ApiResult. |
+| E3-9 | `data/remote/Mapeadores.kt` | Mapeadores DTO <-> entidad de todas las colecciones; valor de enum desconocido devuelve null. | entidad.aDto().aEntidad() es igual a la entidad; estado «XYZ» da null; el estado viaja como nombre del enum; la nota viaja como número. |
+| E3-10 | `data/remote/FuenteRemota.kt (sesión y lecturas)` | Login, logout, descargar lo que el perfil puede leer (AlcanceLectura) y asistencia de un día. | Para UTP no se piden /asistencias, /anotaciones ni /auditoria; un fallo en cualquier colección devuelve el fallo y no una descarga parcial. |
+| E3-11 | `data/remote/FuenteRemota.kt (escrituras)` | Las seis escrituras: asistencia, clase, evaluación (crear y eliminar), notas y anotación. | El JSON enviado coincide con docs/API.md; no se envía firma, hora ni auditoría; 409 y 422 llegan como Error con el mensaje del servidor. |
+| E3-12 | `data/repository/LibroMpazApiRepository.kt (ingresar)` | Login contra /auth/login: token en memoria, usuario con el hash de la clave en Room, ingreso sin red solo con credenciales ya usadas. | Con red deja token y usuario; sin red solo ingresa quien ya ingresó en ese equipo; la clave nunca se guarda en claro. |
+| E3-13 | `data/repository/LibroMpazApiRepository.kt (sincronizar)` | Descargar con FuenteRemota y reemplazar la copia local de una vez (API fuente de verdad, Room caché). | Si la API falla, Room queda como estaba; si Room falla, «No se pudo actualizar la copia local de los datos.»; una sola llamada a reemplazar. |
+| E3-14 | `data/repository/LibroMpazApiRepository.kt (tras)` | Escritura «API primero»: si el servidor acepta se sincroniza; si rechaza se devuelve su mensaje; sin red no se guarda nada. | 409 no cambia Room y muestra el mensaje del servidor; sin red el mensaje termina en «No se guardó nada.»; un éxito dispara una sincronización. |
+| E3-15 | `data/repository/LibroMpazApiRepository.kt (asistenciaDe)` | Asistencia de un día desde la API y, si falla, desde Room. | Con el servidor apagado devuelve lo que hay en Room y no lanza excepción. |
+| E3-16 | `data/remote/ServidorPreferencias.kt` | Guardar, leer y restablecer la URL del servidor en SharedPreferences; ignorar lo guardado si ya no es una dirección local válida. | Sin nada guardado devuelve la URL del build; lo guardado sobrevive al cierre de la app; una dirección pública guardada a mano se ignora. |
+| E3-17 | `viewmodel/LibroMpazViewModel.kt (probarConexion y guardarServidor)` | Cuadro «Servidor»: validar la URL, probar /health sin guardarla y guardarla solo si es local. | Una dirección pública muestra el mensaje bajo el campo y no hace ninguna petición ni se guarda; con el servidor encendido dice «Conexión correcta». |
 
-## Estado del proyecto
+Ya vienen resueltos: `Dtos.kt` y `ApiService.kt` (el contrato de la API: no se modifican), `AlcanceLectura.kt`, `TokenSesion.kt`, `CacheLocal.kt` y `CacheRoom.kt`, el cuadro `ServidorDialog` y el banner `BannerSincronizacion`, el logging de OkHttp solo en debug, la configuración de red y el repositorio local.
 
-**RF-03 — Registro de asistencia:** implementado, integrado en `main` y probado.
+## Cómo correr las pruebas
 
-**Autenticación y permisos:** pendiente de confirmación de integración final.
+```
+./gradlew testDebugUnitTest            # pruebas JVM (JUnit 4, MockK, MockWebServer, coroutines-test)
+./gradlew connectedDebugAndroidTest    # pruebas de interfaz (Compose UI Test), con emulador o dispositivo
+```
 
-Las demás funcionalidades deben verificarse individualmente antes de declararlas terminadas.
+- Se entregan 74 pruebas de reglas (hash de claves, validaciones, RBAC, asistencia, métricas, alertas, desfases, fechas) que deben seguir en verde.
+- `app/src/test/.../data/remote/` y `.../data/repository/` traen archivos de prueba esqueleto con `@Ignore("E3: completar")` y la lista comentada de casos (C01 a C51). `app/src/androidTest/.../ui/LoginScreenTest.kt` trae 3 casos de interfaz (U01 a U03).
+- Pruebas nuevas del interruptor (26, activas, no se tocan): `SelectorFuenteTest` (elige la fuente según la preferencia y cambia en caliente), `PreferenciaModoTest` (valor inicial desde `USAR_API`, la elección en la app manda), `LoginLocalTest` (ingreso local con el mismo hash y sal), `ReglasDeEscrituraTest` (reglas puras compartidas) y `ModoLocalSinRedTest` (las clases del modo local no usan red).
+- `app/src/test/.../testing/CacheFalsa.kt` es una copia local en memoria, ya resuelta, para probar el repositorio sin Room.
 
-## Entrega
+## Cómo generar el APK firmado
 
-La entrega debe cumplir los requisitos establecidos por el docente, incluido el APK firmado en modo release cuando corresponda.
+El repositorio no contiene llaves; la firma es opcional. Si no se definen sus valores, `assembleRelease` genera un APK sin firmar (no instalable).
 
-El repositorio contiene el código fuente y el historial de trabajo colaborativo del equipo.
+**Con el asistente de Android Studio** (Build > Generate Signed App Bundle / APK > APK > Create new...): elegir el `.jks` (dentro del repositorio, por ejemplo en la carpeta `llave/`), variante `release` y marcar las firmas V1 y V2. El detalle paso a paso está en el enunciado de la actividad.
+
+**Con Gradle:**
+
+1. Crear el keystore (llave exclusiva para esta entrega; va en el repositorio):
+   ```
+   keytool -genkeypair -v -keystore mi-llave.jks -alias mi_alias -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Copiar `keystore.properties.example` como `keystore.properties` (queda ignorado por Git) y completar `storeFile` (ruta absoluta), `storePassword`, `keyAlias` y `keyPassword`. Otra opción: `LIBROMPAZ_STORE_FILE`, `LIBROMPAZ_STORE_PASSWORD`, `LIBROMPAZ_KEY_ALIAS` y `LIBROMPAZ_KEY_PASSWORD` en `~/.gradle/gradle.properties` o como variables de entorno.
+3. Ejecutar `./gradlew assembleRelease`. El APK queda en `app/build/outputs/apk/release/`.
+
+Verificar la firma con `apksigner verify --verbose --print-certs app-release.apk` (debe decir que verificó V1 y V2). `versionCode` y `versionName` están en `app/build.gradle.kts`; `.gitignore` excluye `local.properties`, `build/`, `.gradle/`, `.idea/` y `.kotlin/`. Para la evaluación, el `.jks` (llave exclusiva de esta entrega), el APK firmado y su configuración van en el repositorio; no reutilices esa llave en otra app.
+
+## Limitaciones
+
+Prototipo académico: datos ficticios, claves con sal fija de demostración, base local con migración destructiva, sin validez oficial ante el MINEDUC ni el sostenedor.

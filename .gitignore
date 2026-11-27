@@ -1,13 +1,25 @@
+# Gradle / Android Studio
 *.iml
 .gradle/
 /local.properties
 /.idea/
+.kotlin/
 .DS_Store
 /build/
+app/build/
 /captures/
 .externalNativeBuild/
 .cxx/
-app/build/
-**/build/
-*.apk
-*.aab
+
+# Llave de evaluación: la pauta pide incluir el .jks, el APK firmado y su configuración en el repositorio
+
+# Backend (se entrega aparte; si lo copias dentro del repositorio)
+backend/node_modules/
+backend/data/db.json
+backend/data/db.json.tmp
+
+# Credenciales y llaves privadas
+keystore.properties
+*.jks
+*.keystore
+

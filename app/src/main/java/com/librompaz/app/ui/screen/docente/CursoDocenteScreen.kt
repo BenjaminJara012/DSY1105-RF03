@@ -6,14 +6,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Grade
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.librompaz.app.navigation.Rutas
@@ -28,9 +38,10 @@ import com.librompaz.app.viewmodel.LibroMpazViewModel
 fun CursoDocenteScreen(navController: NavHostController, viewModel: LibroMpazViewModel) {
     val cursoId by viewModel.cursoSeleccionadoId.collectAsState()
     val asignaturaId by viewModel.asignaturaSeleccionadaId.collectAsState()
+    val todos by viewModel.estudiantes.collectAsState()
     val curso = viewModel.cursoPorId(cursoId)
     val asignatura = viewModel.asignaturaPorId(asignaturaId)
-    val cantidadEstudiantes = viewModel.estudiantesDelCurso(cursoId).size
+    val cantidadEstudiantes = remember(todos, cursoId) { viewModel.estudiantesDelCurso(cursoId).size }
 
     Scaffold(topBar = { BarraSuperior(curso?.nombre ?: "Curso", navController) }) { padding ->
         Column(
@@ -43,20 +54,23 @@ fun CursoDocenteScreen(navController: NavHostController, viewModel: LibroMpazVie
             Text(asignatura?.nombre.orEmpty(), style = MaterialTheme.typography.titleLarge)
             Text("$cantidadEstudiantes estudiantes", style = MaterialTheme.typography.bodyMedium)
 
-            BotonGrande("Asistencia del día") { navController.navigate(Rutas.ASISTENCIA) }
-            BotonGrande("Registro de clase (OA y contenidos)") { navController.navigate(Rutas.DOC_CLASE) }
-            BotonGrande("Calificaciones") { navController.navigate(Rutas.DOC_CALIFICACIONES) }
-            BotonGrande("Hoja de vida") { navController.navigate(Rutas.DOC_HOJA_VIDA) }
+            BotonGrande("Asistencia del día", Icons.Filled.CheckCircle) { navController.navigate(Rutas.ASISTENCIA) }
+            BotonGrande("Registro de clase (OA y contenidos)", Icons.Filled.DateRange) { navController.navigate(Rutas.DOC_CLASE) }
+            BotonGrande("Calificaciones", Icons.Filled.Grade) { navController.navigate(Rutas.DOC_CALIFICACIONES) }
+            BotonGrande("Hoja de vida", Icons.Filled.Person) { navController.navigate(Rutas.DOC_HOJA_VIDA) }
         }
     }
 }
 
 @Composable
-private fun BotonGrande(texto: String, onClick: () -> Unit) {
+private fun BotonGrande(texto: String, icono: ImageVector, onClick: () -> Unit) {
     Button(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),
         onClick = onClick
-    ) { Text(texto) }
+    ) {
+        Icon(icono, contentDescription = null, modifier = Modifier.padding(end = 8.dp).size(ButtonDefaults.IconSize))
+        Text(texto)
+    }
 }

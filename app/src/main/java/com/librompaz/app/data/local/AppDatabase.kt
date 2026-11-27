@@ -4,56 +4,81 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.withTransaction
-import androidx.sqlite.db.SupportSQLiteDatabase
-import com.librompaz.app.data.MockData
+import androidx.room.TypeConverters
+import com.librompaz.app.model.Anotacion
+import com.librompaz.app.model.Asignatura
+import com.librompaz.app.model.Calificacion
+import com.librompaz.app.model.CargaDocente
+import com.librompaz.app.model.Curso
+import com.librompaz.app.model.Estudiante
+import com.librompaz.app.model.Evaluacion
+import com.librompaz.app.model.ObjetivoAprendizaje
+import com.librompaz.app.model.RegistroAsistencia
+import com.librompaz.app.model.RegistroAuditoria
+import com.librompaz.app.model.SesionClase
+import com.librompaz.app.model.Usuario
 
+/**
+ * DATABASE: une todas las entidades (tablas) con sus DAO y entrega UNA sola instancia de la base
+ * de datos para toda la app (singleton). El archivo SQLite se llama "libro_mpaz.db" y queda en
+ * el almacenamiento interno de la app: los datos sobreviven al cierre de la app.
+ *
+ * Si se cambia una entidad (por ejemplo, se agrega una columna), hay que subir "version".
+ */
 @Database(
-    entities = [AsistenciaEntity::class, AuditoriaEntity::class],
+    entities = [
+        Usuario::class,
+        Curso::class,
+        Asignatura::class,
+        Estudiante::class,
+        CargaDocente::class,
+        RegistroAsistencia::class,
+        ObjetivoAprendizaje::class,
+        SesionClase::class,
+        Evaluacion::class,
+        Calificacion::class,
+        Anotacion::class,
+        RegistroAuditoria::class
+    ],
     version = 1,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
+    abstract fun usuarioDao(): UsuarioDao
+    abstract fun academicoDao(): AcademicoDao
     abstract fun asistenciaDao(): AsistenciaDao
+    abstract fun sesionDao(): SesionDao
+    abstract fun calificacionDao(): CalificacionDao
+    abstract fun anotacionDao(): AnotacionDao
     abstract fun auditoriaDao(): AuditoriaDao
 
-    suspend fun guardarConAuditoria(
-        registros: List<AsistenciaEntity>,
-        auditoria: AuditoriaEntity
-    ) = withTransaction {
-        asistenciaDao().guardar(registros)
-        auditoriaDao().insertar(auditoria)
-    }
-
     companion object {
-        private val semilla = object : Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                MockData.asistencias.forEach { r ->
-                    db.execSQL(
-                        "INSERT INTO asistencias (id, estudianteId, cursoId, fecha, estado, registradoPor, fechaHoraRegistro) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        arrayOf<Any?>(r.id, r.estudianteId, r.cursoId, r.fecha, r.estado.name, r.registradoPor, r.fechaHoraRegistro)
-                    )
-                }
-                MockData.auditoria.forEach { a ->
-                    db.execSQL(
-                        "INSERT INTO auditoria (id, usuario, perfil, accion, detalle, fechaHora) VALUES (?, ?, ?, ?, ?, ?)",
-                        arrayOf<Any?>(a.id, a.usuario, a.perfil.name, a.accion, a.detalle, a.fechaHora)
-                    )
-                }
-            }
-        }
-        @Volatile
-        private var instancia: AppDatabase? = null
+        /** Copia local de lo que sirve la API (modo servidor). Es el archivo que ya usaba la app. */
+        const val NOMBRE_SERVIDOR = "libro_mpaz.db"
 
-        fun construir(context: Context, nombre: String = "libro_mpaz.db"): AppDatabase =
-            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, nombre)
-                .addCallback(semilla)
-                .build()
+        /**
+         * Base propia del modo local: independiente de la copia del servidor, para que lo que se
+         * crea sin servidor no se mezcle con lo que el servidor entrega (ni se pierda al sincronizar).
+         */
+        const val NOMBRE_LOCAL = "libro_mpaz_local.db"
 
-        fun obtener(context: Context): AppDatabase =
-            instancia ?: synchronized(this) {
-                instancia ?: construir(context).also { instancia = it }
+        private val instancias = HashMap<String, AppDatabase>()
+
+        fun getInstance(context: Context, nombre: String = NOMBRE_SERVIDOR): AppDatabase =
+            synchronized(instancias) {
+                instancias.getOrPut(nombre) {
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        AppDatabase::class.java,
+                        nombre
+                    )
+                        // Prototipo con datos ficticios: si cambia el esquema sin migración, se recrea
+                        // la base y se vuelve a poblar con los datos de ejemplo.
+                        .fallbackToDestructiveMigration()
+                        .build()
+                }
             }
     }
 }
