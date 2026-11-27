@@ -66,6 +66,12 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
     var contenido by rememberSaveable { mutableStateOf("") }
     var errores by remember { mutableStateOf(ErroresSesion()) }
 
+
+    // Validación en vivo: solo se muestran errores de los campos que ya tienen texto.
+    val erroresEnVivo = viewModel.validarCamposDeSesion(fecha, bloque, seleccionados.toList(), contenido)
+    val errorBloque = if (bloque.isEmpty()) null else erroresEnVivo.bloque
+    val errorContenido = if (contenido.isEmpty()) null else erroresEnVivo.contenido
+
     Scaffold(topBar = { BarraSuperior("Registro de clase", navController) }) { padding ->
         Column(
             modifier = Modifier
@@ -99,7 +105,7 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
                     etiqueta = "Bloque",
                     marcador = "Bloque 1",
                     icono = Icons.Filled.Schedule,
-                    error = errores.bloque,
+                    error = errorBloque ?: errores.bloque,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -142,7 +148,7 @@ fun RegistroClaseScreen(navController: NavHostController, viewModel: LibroMpazVi
                 icono = Icons.Filled.Edit,
                 singleLine = false,
                 minLines = 3,
-                error = errores.contenido,
+                error = errorContenido ?: errores.contenido,
                 modifier = Modifier.fillMaxWidth()
             )
 
