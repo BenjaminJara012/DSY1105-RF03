@@ -45,6 +45,18 @@ class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : 
     val llamadas = mutableListOf<String>()
     var resultadoEscritura: ApiResult<Unit> = ApiResult.Exito(Unit)
 
+    // Datos configurables para las pruebas del ViewModel.
+    var cursosPrueba: List<Curso> =
+        listOf(Curso("C-$nombre", nombre))
+
+    var estudiantesPrueba: List<Estudiante> = emptyList()
+
+    var cargasPrueba: List<CargaDocente> = emptyList()
+
+    var asistenciasPrueba: List<RegistroAsistencia> = emptyList()
+
+    var usuarioPrueba: Usuario = MockData.usuarios.first()
+
     private fun anotar(operacion: String) {
         if (prohibida) throw AssertionError("la fuente \"$nombre\" no debía usarse (operación: $operacion)")
         llamadas += operacion
@@ -55,12 +67,12 @@ class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : 
         return MutableStateFlow(valor)
     }
 
-    override val cursos: Flow<List<Curso>> get() = flujo(listOf(Curso("C-$nombre", nombre)))
+    override val cursos: Flow<List<Curso>> get() = flujo(cursosPrueba)
     override val asignaturas: Flow<List<Asignatura>> get() = flujo(emptyList())
-    override val estudiantes: Flow<List<Estudiante>> get() = flujo(emptyList())
+    override val estudiantes: Flow<List<Estudiante>> get() = flujo(estudiantesPrueba)
     override val objetivos: Flow<List<ObjetivoAprendizaje>> get() = flujo(emptyList())
-    override val cargas: Flow<List<CargaDocente>> get() = flujo(emptyList())
-    override val asistencias: Flow<List<RegistroAsistencia>> get() = flujo(emptyList())
+    override val cargas: Flow<List<CargaDocente>> get() = flujo(cargasPrueba)
+    override val asistencias: Flow<List<RegistroAsistencia>> get() = flujo(asistenciasPrueba)
     override val sesiones: Flow<List<SesionClase>> get() = flujo(emptyList())
     override val evaluaciones: Flow<List<Evaluacion>> get() = flujo(emptyList())
     override val calificaciones: Flow<List<Calificacion>> get() = flujo(emptyList())
@@ -72,10 +84,18 @@ class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : 
 
     override suspend fun poblarSiVacia() = anotar("poblarSiVacia")
 
-    override suspend fun ingresar(correo: String, clave: String): ResultadoLogin {
+    override suspend fun ingresar(
+        correo: String,
+        clave: String
+    ): ResultadoLogin {
         anotar("ingresar")
-        val usuario = MockData.usuarios.first()
-        return if (nombre == "local") ResultadoLogin.Aceptado(usuario) else ResultadoLogin.SinConexion(usuario, "sin servidor")
+
+        val usuario = usuarioPrueba
+        return if (nombre == "local") {
+            ResultadoLogin.Aceptado(usuario)
+        } else {
+            ResultadoLogin.SinConexion(usuario, "sin servidor")
+        }
     }
 
     override fun retirarToken(): String? {
@@ -90,9 +110,14 @@ class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : 
         return ApiResult.Exito(Unit)
     }
 
-    override suspend fun asistenciaDe(cursoId: String, fecha: String): List<RegistroAsistencia> {
+    override suspend fun asistenciaDe(
+        cursoId: String,
+        fecha: String
+    ): List<RegistroAsistencia> {
         anotar("asistenciaDe")
-        return emptyList()
+        return asistenciasPrueba.filter {
+            it.cursoId == cursoId && it.fecha == fecha
+        }
     }
 
     override suspend fun guardarAsistencia(

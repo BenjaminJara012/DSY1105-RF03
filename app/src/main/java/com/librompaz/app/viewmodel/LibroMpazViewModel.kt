@@ -130,36 +130,61 @@ data class ServidorUiState(
  *
  * Es AndroidViewModel porque necesita un Context para abrir la base de datos.
  */
-class LibroMpazViewModel(application: Application) : AndroidViewModel(application) {
+class LibroMpazViewModel(
+    application: Application,
+    modoPrueba: PreferenciaModo?,
+    repositorioPrueba: LibroMpazDatos?
+) : AndroidViewModel(application) {
+
+    // Conserva el constructor utilizado por Android.
+    constructor(application: Application) : this(
+        application,
+        null,
+        null
+    )
 
     /**
      * Preferencia persistente "modo local" (el interruptor de la Experiencia 3 en tiempo de ejecución).
      * BuildConfig.USAR_API solo define el VALOR INICIAL (false = modo local, true = modo servidor);
      * después manda lo que se elija en el cuadro "Servidor". Se lee en cada operación (ver SelectorFuente).
      */
-    private val modo: PreferenciaModo = PreferenciaModoPersistente(
-        almacen = AlmacenModoPreferencias(application),
-        valorInicial = modoLocalInicial(BuildConfig.USAR_API)
-    )
+    private val modo: PreferenciaModo =
+        modoPrueba ?: PreferenciaModoPersistente(
+            almacen = AlmacenModoPreferencias(application),
+            valorInicial = modoLocalInicial(BuildConfig.USAR_API)
+        )
 
     // Solo se usan en modo servidor (lazy): en modo local nunca se tocan, así que no hay cliente HTTP ni red.
     private val servidor by lazy { ServidorPreferencias(application) }
     private val tokenSesion by lazy { TokenSesion() }
     private val apiClient by lazy { ApiClient(tokenSesion) }
 
-    // MODO LOCAL: solo Room, su propia base (independiente de la copia del servidor), sin red.
-    private val repositorioLocal: LibroMpazDatos =
-        LibroMpazRepository(AppDatabase.getInstance(application, AppDatabase.NOMBRE_LOCAL))
+    private val repositorioLocal: LibroMpazDatos by lazy {
+        LibroMpazRepository(
+            AppDatabase.getInstance(
+                application,
+                AppDatabase.NOMBRE_LOCAL
+            )
+        )
+    }
 
-    // MODO SERVIDOR: la API es la fuente de verdad y Room (otra base) la caché. Construirlo no abre ninguna conexión.
-    private val repositorioServidor: LibroMpazDatos = LibroMpazApiRepository(
-        cache = CacheRoom(AppDatabase.getInstance(application)),
-        remota = FuenteRemota { apiClient.servicio(servidor.urlActual()) },
-        sesion = tokenSesion
-    )
+    private val repositorioServidor: LibroMpazDatos by lazy {
+        LibroMpazApiRepository(
+            cache = CacheRoom(AppDatabase.getInstance(application)),
+            remota = FuenteRemota {
+                apiClient.servicio(servidor.urlActual())
+            },
+            sesion = tokenSesion
+        )
+    }
 
     // Lo único que ve el resto del ViewModel: elige la fuente según la preferencia en cada operación.
-    private val repository: LibroMpazDatos = SelectorFuente(modo, repositorioLocal, repositorioServidor)
+    private val repository: LibroMpazDatos =
+        repositorioPrueba ?: SelectorFuente(
+            modo,
+            repositorioLocal,
+            repositorioServidor
+        )
 
     /** true si se trabaja en modo servidor (se lee en el momento, no al arrancar). */
     private fun enModoServidor(): Boolean = !modo.modoLocal
