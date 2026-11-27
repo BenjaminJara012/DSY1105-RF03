@@ -26,12 +26,41 @@ class FuenteRemota(private val apiProvider: () -> ApiService) {
     //        (LoginResponse trae el token y el UsuarioDto).
     //   ACEPTACIÓN: credenciales correctas -> Exito con token no vacío; clave incorrecta (401) -> Error con el
     //        mensaje del servidor; servidor apagado -> SinConexion.
-    suspend fun iniciarSesion(correo: String, clave: String): ApiResult<LoginResponse> = TODO("E3-10: login")
+
+    /**
+     * Envía las credenciales al servidor para iniciar sesión.
+     *
+     * llamarApi transforma las respuestas y errores HTTP
+     * en ApiResult.Exito, ApiResult.Error o ApiResult.SinConexion.
+     */
+    suspend fun iniciarSesion(
+        correo: String,
+        clave: String
+    ): ApiResult<LoginResponse> {
+
+        return llamarApi {
+            apiProvider().login(
+                LoginRequest(
+                    usuario = correo.trim(),
+                    clave = clave
+                )
+            )
+        }
+    }
 
     // TODO(E3-10) [FuenteRemota.kt] Cerrar sesión: POST /auth/logout.
     //   QUÉ: llamar a logout("Bearer $token") (aquí el encabezado va a mano) con llamarApi.
     //   ACEPTACIÓN: la petición lleva "Authorization: Bearer <token>" una sola vez; si falla, no lanza excepción.
-    suspend fun cerrarSesion(token: String): ApiResult<OkDto> = TODO("E3-10: logout")
+
+    /**
+     * Solicita al servidor cerrar la sesión.
+     * Envía el token en el encabezado Authorization.
+     */
+    suspend fun cerrarSesion(token: String): ApiResult<OkDto> {
+        return llamarApi {
+            apiProvider().logout("Bearer $token")
+        }
+    }
 
     // TODO(E3-10) [FuenteRemota.kt] Descargar todo lo que el perfil puede leer.
     //   QUÉ: pedir cursos, asignaturas y objetivos (los leen todos) y, solo las colecciones que
