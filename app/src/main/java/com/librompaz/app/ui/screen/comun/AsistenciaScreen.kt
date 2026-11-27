@@ -41,6 +41,11 @@ import com.librompaz.app.ui.components.BarraSuperior
 import com.librompaz.app.ui.components.CampoFecha
 import com.librompaz.app.util.hoy
 import com.librompaz.app.viewmodel.LibroMpazViewModel
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 
 /**
  * Módulo "Asistencia" (RF-03, RF-04, RF-05): registro diario del curso con cuatro estados
@@ -80,6 +85,13 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
 
     // Los estudiantes que no se tocaron quedan como PRESENTE.
     val completo = estudiantes.associate { it.id to (estados[it.id] ?: EstadoAsistencia.PRESENTE) }
+
+    // La lista se desvanece mientras carga y aparece suavemente al terminar.
+    val opacidadLista by animateFloatAsState(
+        targetValue = if (cargando) 0f else 1f,
+        animationSpec = tween(500),
+        label = "opacidadLista"
+    )
 
     Scaffold(topBar = { BarraSuperior("Asistencia · ${curso?.nombre.orEmpty()}", navController) }) { padding ->
         Column(
@@ -128,7 +140,9 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                         "${estado.abreviatura} ${completo.values.count { it == estado }}"
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .alpha(opacidadLista),
                 )
                 TextButton(onClick = { estados = estudiantes.associate { it.id to EstadoAsistencia.PRESENTE } }) {
                     Text("Todos presentes")
@@ -141,9 +155,18 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
             ) {
                 items(estudiantes, key = { it.id }) { estudiante ->
                     val actual = completo[estudiante.id] ?: EstadoAsistencia.PRESENTE
+                    // Las excepciones (A, T, J) se resaltan con el color de su estado.
+                    val fondoFila by animateColorAsState(
+                        targetValue = if (actual == EstadoAsistencia.PRESENTE) Color.Transparent
+                        else colorDe(actual).copy(alpha = 0.12f),
+                        label = "fondoFila"
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(fondoFila, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp)
                     ) {
                         Text(estudiante.nombreFicticio, modifier = Modifier.weight(1f))
                         EstadoAsistencia.entries.forEach { opcion ->
