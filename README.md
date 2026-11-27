@@ -1,5 +1,50 @@
 # LibroMpaz — Libro de clases digital (prototipo académico)
 
+## Integrantes
+
+- Constanza Hernández
+- Benjamín Jara
+- Víctor Cortez
+- Esteban Varas
+
+## Entrega Evaluación Parcial 3
+
+**Alcance:** según indicó el profesor, la API REST queda pendiente por falta de ambiente backend. La entrega se presenta en **modo local (Room)**; esta indicación prevalece sobre las menciones al modo servidor en este documento. No hay una API externa integrada.
+
+### Entregables
+
+- APK firmado: [entrega/librompaz-ep3-v1.0.apk](entrega/librompaz-ep3-v1.0.apk)
+- Llave de firma, exclusiva para esta entrega: [llave/librompaz-ep3.jks](llave/librompaz-ep3.jks)
+- Informe de pruebas y cobertura: [docs/testing/README.md](docs/testing/README.md)
+
+### Funcionalidades (modo local)
+
+Inicio de sesión y permisos por perfil, asistencia, registro de clase y cobertura curricular, calificaciones (crear, leer, actualizar y eliminar), hoja de vida, paneles de UTP, Inspectoría y Dirección, auditoría, vibración y lectura por voz.
+
+### Cómo ejecutar
+
+Abrir el proyecto en Android Studio, sincronizar Gradle y presionar Run, o instalar el APK firmado. Usar los datos de "Perfiles y usuarios de prueba" y mantener el modo local.
+
+### Endpoints
+
+Contrato Retrofit en `ApiService.kt` (integración pendiente):
+
+- GET: `health`, `me`, `cursos`, `asignaturas`, `objetivos`, `estudiantes`, `cargas`, `asistencias`, `sesiones`, `evaluaciones`, `calificaciones`, `anotaciones`, `auditoria`
+- POST: `auth/login`, `auth/logout`, `sesiones`, `evaluaciones`, `anotaciones`
+- PUT: `cursos/{cursoId}/asistencia/{fecha}`, `evaluaciones/{id}/calificaciones`
+- DELETE: `evaluaciones/{id}`
+
+### Pruebas unitarias (27-11-2026)
+
+176 en total: 125 aprobadas, 51 omitidas y 0 fallos.
+
+### Capturas del APK firmado y del .jks
+
+![APK firmado y llave](docs/apk/apk-y-jks.png)
+
+![Verificación de la firma](docs/apk/firma-apk.png)
+
+
 Aplicación Android (Kotlin, Jetpack Compose Material 3, MVVM, Room) que simula el libro de clases digital de un colegio básico. Es un prototipo de uso interno: todos los datos son ficticios y el flujo es aislado: no se envía ni se exporta información fuera del dispositivo o, en modo API, fuera de la red local del aula (RN-01, RNF-07).
 
 La app trae dos modos que se cambian **en tiempo de ejecución**, sin recompilar, con el interruptor "Modo local (sin servidor)" del cuadro **Servidor** (botón en el login):
