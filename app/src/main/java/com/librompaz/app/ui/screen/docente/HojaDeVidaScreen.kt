@@ -64,6 +64,10 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
     var confirmando by remember { mutableStateOf(false) }
     val historial = remember(todas, estudiante) { viewModel.anotacionesDe(estudiante?.id) }
 
+    // Validación en vivo: se revisa la descripción mientras se escribe (no con el campo vacío).
+    val errorEnVivo =
+        if (descripcion.isEmpty()) null
+        else viewModel.validarNuevaAnotacion(estudiante, tipo, descripcion).descripcion
     Scaffold(topBar = { BarraSuperior("Hoja de vida", navController) }) { padding ->
         Column(
             modifier = Modifier
@@ -108,7 +112,7 @@ fun HojaDeVidaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                 icono = Icons.Filled.Edit,
                 singleLine = false,
                 minLines = 3,
-                error = errores.descripcion,
+                error = errorEnVivo ?: errores.descripcion,
                 ayuda = "${descripcion.trim().length}/300 · mínimo 10 caracteres",
                 modifier = Modifier.fillMaxWidth()
             )
