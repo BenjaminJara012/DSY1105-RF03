@@ -7,8 +7,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     // KSP: genera el código de Room (DAO, base de datos) al compilar.
     alias(libs.plugins.ksp)
+    jacoco
 }
-
+jacoco {
+    toolVersion = "0.8.12"
+}
 // ---------------------------------------------------------------------------------------
 // Firma del APK release (opcional). Los datos de la llave NUNCA se guardan en el repositorio.
 // Se leen, en este orden, de:
@@ -79,6 +82,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             if (firmaCompleta) {
