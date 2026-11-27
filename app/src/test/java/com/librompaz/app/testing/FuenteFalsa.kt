@@ -43,7 +43,11 @@ class AlmacenModoFalso(var valor: Boolean? = null) : AlmacenModo {
 class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : LibroMpazDatos {
 
     val llamadas = mutableListOf<String>()
+
     var resultadoEscritura: ApiResult<Unit> = ApiResult.Exito(Unit)
+
+    // Permite simular excepciones inesperadas durante el guardado.
+    var excepcionEscritura: Exception? = null
 
     // Datos configurables para las pruebas del ViewModel.
     var cursosPrueba: List<Curso> =
@@ -128,6 +132,9 @@ class FuenteFalsa(val nombre: String, private val prohibida: Boolean = false) : 
         detalle: String
     ): ApiResult<Unit> {
         anotar("guardarAsistencia")
+
+        excepcionEscritura?.let { throw it }
+
         return resultadoEscritura
     }
 

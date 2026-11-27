@@ -23,6 +23,9 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import com.librompaz.app.data.remote.ApiResult
+import com.librompaz.app.model.RegistroAsistencia
+
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AsistenciaViewModelTest {
@@ -179,5 +182,302 @@ class AsistenciaViewModelTest {
 
         assertFalse(fuente.llamadas.contains("guardarAsistencia"))
         assertTrue(viewModel.aviso.value?.esError == true)
+    }
+
+    @Test
+    fun guardarCursoNoAutorizado_rechazaOperacion() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        val otroCurso = fuente.cursosPrueba.first {
+            it.id != cursoId
+        }
+
+        val estados = fuente.estudiantesPrueba
+            .filter { it.cursoId == otroCurso.id }
+            .associate { it.id to EstadoAsistencia.PRESENTE }
+
+        assertNotNull(viewModel.usuarioActivo.value)
+        assertTrue(estados.isNotEmpty())
+
+        viewModel.guardarAsistencia(
+            otroCurso.id,
+            fechaValida,
+            estados
+        ) {
+            fail("No debería guardar en un curso no autorizado")
+        }
+
+        advanceUntilIdle()
+
+        assertFalse(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+    }
+
+    @Test
+    fun guardarEstudianteAjeno_rechazaOperacion() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        val estudianteAjeno = fuente.estudiantesPrueba.first {
+            it.cursoId != cursoId
+        }
+
+        val estados = estadosValidos() +
+                (estudianteAjeno.id to EstadoAsistencia.AUSENTE)
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estados
+        ) {
+            fail("No debería guardar estudiantes ajenos al curso")
+        }
+
+        advanceUntilIdle()
+
+        assertFalse(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+    }
+
+    @Test
+    fun guardarFechaInexistente_rechazaOperacion() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        val fechaInvalida = "2026-02-30"
+
+        assertNotNull(
+            viewModel.validarFechaAsistencia(fechaInvalida)
+        )
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaInvalida,
+            estadosValidos()
+        ) {
+            fail("No debería guardar una fecha inexistente")
+        }
+
+        advanceUntilIdle()
+
+        assertFalse(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+    }
+
+    @Test
+    fun guardarConErrorRepositorio_muestraError() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        fuente.resultadoEscritura = ApiResult.Error(
+            mensaje = "Conflicto al guardar asistencia",
+            codigo = 409
+        )
+
+        var finalizado = false
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizado = true
+        }
+
+        advanceUntilIdle()
+
+        assertTrue(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+        assertFalse(finalizado)
+        assertFalse(viewModel.guardando.value)
+        assertNotNull(viewModel.usuarioActivo.value)
+    }
+
+    @Test
+    fun guardarSinConexion_actualizaEstadoSync() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        fuente.resultadoEscritura = ApiResult.SinConexion(
+            mensaje = "Servidor no disponible"
+        )
+
+        var finalizado = false
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizado = true
+        }
+
+        advanceUntilIdle()
+
+        assertTrue(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+
+        assertTrue(
+            viewModel.estadoSync.value is
+                    EstadoSincronizacion.SinConexion
+        )
+
+        assertFalse(finalizado)
+        assertFalse(viewModel.guardando.value)
+        assertNotNull(viewModel.usuarioActivo.value)
+    }
+
+    @Test
+    fun guardarConSesionExpirada_reiniciaSesion() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        fuente.resultadoEscritura = ApiResult.Error(
+            mensaje = "Sesion expirada",
+            codigo = 401
+        )
+
+        var finalizado = false
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizado = true
+        }
+
+        advanceUntilIdle()
+
+        assertTrue(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(fuente.llamadas.contains("retirarToken"))
+        assertNull(viewModel.usuarioActivo.value)
+        assertNotNull(viewModel.login.value.errores.general)
+        assertFalse(finalizado)
+        assertFalse(viewModel.guardando.value)
+    }
+
+    @Test
+    fun recuperarAsistenciaGuardada_devuelveEstadosCorrectos() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        val estudiante = fuente.estudiantesPrueba.first {
+            it.cursoId == cursoId
+        }
+
+        val registro = RegistroAsistencia(
+            id = "RA-TEST-1",
+            estudianteId = estudiante.id,
+            cursoId = cursoId,
+            fecha = fechaValida,
+            estado = EstadoAsistencia.AUSENTE,
+            registradoPor = fuente.usuarioPrueba.id,
+            fechaHoraRegistro = "${fechaValida}T08:00:00"
+        )
+
+        fuente.asistenciasPrueba = listOf(
+            registro,
+            registro.copy(
+                id = "RA-TEST-2",
+                fecha = "2026-10-02",
+                estado = EstadoAsistencia.PRESENTE
+            ),
+            registro.copy(
+                id = "RA-TEST-3",
+                cursoId = "OTRO-CURSO",
+                estado = EstadoAsistencia.ATRASADO
+            )
+        )
+
+        val resultado = viewModel.asistenciaGuardada(
+            cursoId,
+            fechaValida
+        )
+
+        assertTrue(fuente.llamadas.contains("asistenciaDe"))
+
+        assertEquals(
+            mapOf(estudiante.id to EstadoAsistencia.AUSENTE),
+            resultado
+        )
+    }
+
+    @Test
+    fun guardarConExcepcion_muestraErrorYLiberaGuardado() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        fuente.excepcionEscritura =
+            IllegalStateException("Fallo simulado de persistencia")
+
+        var finalizado = false
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizado = true
+        }
+
+        advanceUntilIdle()
+
+        assertTrue(fuente.llamadas.contains("guardarAsistencia"))
+        assertTrue(viewModel.aviso.value?.esError == true)
+        assertFalse(finalizado)
+        assertFalse(viewModel.guardando.value)
+        assertNotNull(viewModel.usuarioActivo.value)
+    }
+
+    @Test
+    fun guardarDosVeces_ejecutaUnaSolaOperacion() = runTest {
+        iniciarSesion()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.usuarioActivo.value)
+
+        var finalizaciones = 0
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizaciones++
+        }
+
+        assertTrue(viewModel.guardando.value)
+
+        viewModel.guardarAsistencia(
+            cursoId,
+            fechaValida,
+            estadosValidos()
+        ) {
+            finalizaciones++
+        }
+
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            fuente.llamadas.count {
+                it == "guardarAsistencia"
+            }
+        )
+
+        assertEquals(1, finalizaciones)
+        assertFalse(viewModel.guardando.value)
     }
 }
