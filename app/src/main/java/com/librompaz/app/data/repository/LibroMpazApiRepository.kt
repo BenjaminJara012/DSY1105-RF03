@@ -11,6 +11,8 @@ import com.librompaz.app.model.RegistroAsistencia
 import com.librompaz.app.model.TipoAnotacion
 import com.librompaz.app.model.Usuario
 import kotlinx.coroutines.flow.Flow
+import com.librompaz.app.domain.ClaveSegura
+import com.librompaz.app.data.remote.aEntidad
 
 /**
  * REPOSITORY CON API (BuildConfig.USAR_API = true). Es la clase que completan en la Experiencia 3.
@@ -78,8 +80,65 @@ class LibroMpazApiRepository(
     //          no coincide -> Rechazado("Correo o clave incorrectos"); si no existe -> NoDisponible(mensaje).
     //   ACEPTACIÓN: docente.mat@libromp.cl con su clave deja el token en la sesión y el usuario en la caché; con servidor
     //        apagado solo ingresa quien ya ingresó antes en ese equipo; la clave NUNCA se guarda en claro.
-    override suspend fun ingresar(correo: String, clave: String): ResultadoLogin = TODO("E3-12: ingresar contra la API")
+    override suspend fun ingresar(correo: String, clave: String): ResultadoLogin {
 
+        // Solicita la autenticación al servidor.
+        val resultado = remota.iniciarSesion(correo.trim(), clave)
+
+        return when (resultado) {
+
+            // El servidor aceptó las credenciales.
+            is ApiResult.Exito -> {
+
+                val respuesta = resultado.dato
+
+                // Convierte el usuario recibido en un modelo local.
+                // Solo se guarda el hash, nunca la clave original.
+                val usuario = respuesta.usuario.aEntidad(
+                    ClaveSegura.hash(clave)
+                ) ?: return ResultadoLogin.Rechazado(
+                    MENSAJE_CREDENCIALES
+                )
+
+                // Guarda el usuario para futuras consultas sin conexión.
+                cache.guardarUsuario(usuario)
+
+                // Mantiene el token de sesión en memoria.
+                sesion.token = respuesta.token
+
+                ResultadoLogin.Aceptado(usuario)
+            }
+
+            // El servidor rechazó las credenciales.
+            is ApiResult.Error -> {
+                ResultadoLogin.Rechazado(resultado.mensaje)
+            }
+
+            // No fue posible conectarse con el servidor.
+            is ApiResult.SinConexion -> {
+
+                // Busca credenciales utilizadas anteriormente.
+                val usuario = cache.buscarUsuario(correo.trim())
+
+                when {
+                    usuario == null -> {
+                        ResultadoLogin.NoDisponible(resultado.mensaje)
+                    }
+
+                    ClaveSegura.coincide(clave, usuario.claveHash) -> {
+                        ResultadoLogin.SinConexion(
+                            usuario,
+                            "${resultado.mensaje} Trabajas con los datos de la última sincronización."
+                        )
+                    }
+
+                    else -> {
+                        ResultadoLogin.Rechazado(MENSAJE_CREDENCIALES)
+                    }
+                }
+            }
+        }
+    }
     // TODO(E3-13) [LibroMpazApiRepository.kt] Sincronizar: API -> Room (lectura con la API como fuente de verdad).
     //   QUÉ: pedir a remota.descargarTodo(usuario.perfil); si es Exito, aplicar cache.reemplazar(instantánea) y
     //        devolver Exito(Unit); si falla la API devolver ese fallo SIN tocar Room; si Room lanza una excepción,
