@@ -140,9 +140,7 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
                         "${estado.abreviatura} ${completo.values.count { it == estado }}"
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .weight(1f)
-                        .alpha(opacidadLista),
+                    modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = { estados = estudiantes.associate { it.id to EstadoAsistencia.PRESENTE } }) {
                     Text("Todos presentes")
@@ -150,7 +148,9 @@ fun AsistenciaScreen(navController: NavHostController, viewModel: LibroMpazViewM
             }
 
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .alpha(opacidadLista),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(estudiantes, key = { it.id }) { estudiante ->
