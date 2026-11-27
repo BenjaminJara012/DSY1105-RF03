@@ -46,6 +46,7 @@ import com.librompaz.app.domain.validarAnotacion
 import com.librompaz.app.domain.validarFecha
 import com.librompaz.app.domain.validarLogin
 import com.librompaz.app.domain.validarNotasDeEvaluacion
+import com.librompaz.app.domain.validarSesion
 import com.librompaz.app.model.Anotacion
 import com.librompaz.app.model.Asignatura
 import com.librompaz.app.model.Calificacion
@@ -615,6 +616,10 @@ class LibroMpazViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun sesionesDe(cursoId: String?, asignaturaId: String?): List<SesionClase> =
         sesiones.value.filter { it.cursoId == cursoId && it.asignaturaId == asignaturaId }
+
+    /** Revisa los campos de la clase sin guardar, para mostrar los errores mientras se escribe. */
+    fun validarCamposDeSesion(fecha: String, bloque: String, oaIds: List<String>, contenido: String): ErroresSesion =
+        validarSesion(fecha, bloque, oaIds, contenido, hoy())
 
     /**
      * RF-06: valida y guarda la clase con sus OA y contenidos (RN-03: solo en las cargas del
